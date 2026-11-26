@@ -9,13 +9,18 @@ import { dynamicFacts, STATIC_FACTS } from './facts.js';
 import { playerHe, POSITION_HE, teamHe } from './hebrew.js';
 import { addSubscription, getPrefs, publicKey, removeSubscription, sendPush } from './push.js';
 import { startScheduler } from './scheduler.js';
-import { initStore } from './store.js';
+import { dbConnected, initStore } from './store.js';
 import { imageHandler } from './images.js';
+import { adminGuard, cleanText, rateLimit, securityHeaders, validSubscription } from './security.js';
 import { hotPlayers, playerLogs, playersTable, teamAverages, teamSummary, topPerformer } from './stats.js';
 
 const TEAM = config.teamCode;
 const app = express();
-app.use(express.json());
+app.set('trust proxy', 1); // Render יושב מאחורי proxy – כדי לזהות את כתובת ה-IP האמיתית
+app.disable('x-powered-by');
+app.use(securityHeaders);
+app.use(express.json({ limit: '8kb' }));
+app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 120 }));
 
 const strip = (g) => g && (({ raw, ...rest }) => rest)(g);
 
@@ -180,27 +185,32 @@ app.get('/api/standings', (req, res) => {
 
 // ---- פוש ----
 app.get('/api/push/key', (req, res) => res.json({ publicKey: publicKey() }));
-app.post('/api/push/subscribe', (req, res) => {
-  if (!req.body?.subscription?.endpoint) return res.status(400).json({ error: 'missing subscription' });
-  addSubscription(req.body.subscription, req.body.prefs);
+const pushLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+app.post('/api/push/subscribe', pushLimit, (req, res) => {
+  const sub = req.body?.subscription;
+  if (!validSubscription(sub)) return res.status(400).json({ error: 'הרשמה לא תקינה' });
+  const prefs = { start: req.body?.prefs?.start !== false, close: req.body?.prefs?.close !== false };
+  const clean = { endpoint: sub.endpoint, expirationTime: null, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
+  if (!addSubscription(clean, prefs)) return res.status(503).json({ error: 'הגענו למספר המרבי של מכשירים רשומים' });
   res.json({ ok: true });
 });
-app.post('/api/push/unsubscribe', (req, res) => {
-  removeSubscription(req.body?.endpoint);
+app.post('/api/push/unsubscribe', pushLimit, (req, res) => {
+  if (typeof req.body?.endpoint === 'string') removeSubscription(req.body.endpoint);
   res.json({ ok: true });
 });
-app.post('/api/push/prefs', (req, res) => res.json(getPrefs(req.body?.endpoint)));
+app.post('/api/push/prefs', (req, res) => res.json(typeof req.body?.endpoint === 'string' ? getPrefs(req.body.endpoint) : null));
 
 // ---- ניהול (דורש טוקן) ----
-const admin = (req, res, next) => (req.get('x-admin-token') === config.adminToken ? next() : res.status(401).json({ error: 'טוקן שגוי' }));
+const admin = adminGuard(config.adminToken);
 app.get('/api/admin/roster', admin, (req, res) => res.json({ roster: unifiedRoster().map((p) => ({ code: p.code, nameHe: p.nameHe, dorsal: state().roster.find((r) => r.code === p.code)?.dorsal })), injuries: injuries(), active: activeInjuries() }));
 app.post('/api/admin/injuries', admin, async (req, res) => {
-  const { playerCode, injury, expectedReturn, note, remove } = req.body || {};
-  if (!playerCode) return res.status(400).json({ error: 'חסר שחקן' });
+  const { playerCode, remove } = req.body || {};
+  if (typeof playerCode !== 'string' || !/^\w{1,20}$/.test(playerCode)) return res.status(400).json({ error: 'חסר שחקן' });
   if (remove) clearInjury(playerCode);
   else {
     const p = unifiedRoster().find((x) => x.code === playerCode);
-    setInjury({ playerCode, playerName: p?.nameHe || playerCode, injury, expectedReturn, note });
+    if (!p) return res.status(400).json({ error: 'השחקן לא נמצא בסגל' });
+    setInjury({ playerCode, playerName: p.nameHe, injury: cleanText(req.body.injury), expectedReturn: cleanText(req.body.expectedReturn, 60), note: cleanText(req.body.note, 200) });
   }
   const g = nextGame();
   if (g) await buildPreview(g).catch(() => {});
@@ -220,7 +230,7 @@ app.post('/api/admin/test-push', admin, async (req, res) => {
 app.get('/img/:w/:key', imageHandler('img'));
 app.get('/logo/:w/:key', imageHandler('logo'));
 
-app.get('/healthz', (req, res) => res.json({ ok: true, updatedAt: state().updatedAt, db: !!process.env.DATABASE_URL }));
+app.get('/healthz', (req, res) => res.json({ ok: true, updatedAt: state().updatedAt, db: dbConnected() }));
 
 const pub = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'public');
 app.use(express.static(pub, { extensions: ['html'] }));

@@ -7,6 +7,7 @@ const api = async (p) => {
   if (!r.ok) throw new Error(r.status);
   return r.json();
 };
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : '-');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const fmtDate = (d, opts) => new Intl.DateTimeFormat('he-IL', { timeZone: TZ, ...opts }).format(new Date(d));
 const dayDate = (d) => fmtDate(d, { weekday: 'long', day: 'numeric', month: 'numeric' });
@@ -32,7 +33,7 @@ const resultBadge = (g) => {
   const [us, them] = ourScore(g);
   return `<span class="badge ${us > them ? 'W' : 'L'}">${us > them ? 'נ' : 'ה'}</span>`;
 };
-const formBadges = (form) => `<div class="form">${(form || []).map((r) => `<span class="badge ${r}">${r === 'W' ? 'נ' : 'ה'}</span>`).join('')}</div>`;
+const formBadges = (form) => `<div class="form">${(form || []).map((r) => `<span class="badge ${r === 'W' ? 'W' : 'L'}">${r === 'W' ? 'נ' : 'ה'}</span>`).join('')}</div>`;
 
 function matchCard(g, { label, link = true } = {}) {
   const done = g.status === 'result';
@@ -41,14 +42,14 @@ function matchCard(g, { label, link = true } = {}) {
     : `<div class="big-time">${g.timeTBD ? 'טרם נקבע' : hour(g.date)}</div><div class="when">${dayDate(g.date)}</div>${g.timeTBD ? '' : `<span class="countdown">${countdown(g.date)}</span>`}`;
   // בתצוגה מימין לשמאל: קבוצת הבית מימין
   return `<div class="card">
-    <div class="match-head"><span>${esc(label || '')}</span><span><span class="comp comp-${g.comp}">${esc(g.compHe)}</span> ${esc(g.stage || '')}</span></div>
+    <div class="match-head"><span>${esc(label || '')}</span><span><span class="comp comp-${esc(g.comp)}">${esc(g.compHe)}</span> ${esc(g.stage || '')}</span></div>
     <div class="match">
       <div class="team">${crest(g.home)}<span>${esc(g.home.nameHe)}</span></div>
       <div class="mid">${mid}</div>
       <div class="team">${crest(g.away)}<span>${esc(g.away.nameHe)}</span></div>
     </div>
     ${g.venue ? `<div class="when" style="text-align:center;margin-top:8px">📍 ${esc(g.venue)}</div>` : ''}
-    ${link ? `<a class="cta" href="#/game/${g.id}">${done ? 'פרטי המשחק ←' : 'לפני המשחק: פצועים, מפגשי עבר ושחקנים חמים ←'}</a>` : ''}
+    ${link ? `<a class="cta" href="#/game/${esc(g.id)}">${done ? 'פרטי המשחק ←' : 'לפני המשחק: פצועים, מפגשי עבר ושחקנים חמים ←'}</a>` : ''}
   </div>`;
 }
 
@@ -112,12 +113,12 @@ async function home() {
     </div>
     <div class="card" style="margin-top:10px;display:flex;justify-content:space-between;align-items:center"><span class="muted">5 משחקים אחרונים</span>${formBadges(s.form)}</div>
     <h2>מובילי הקבוצה</h2>
-    <div class="leaders">${d.leaders.map((l) => `<a class="card leader" href="#/player/${l.code}">${img(l.headshot)}<div><div class="val">${l.value}</div><div class="small muted">${STAT_HE[l.stat]} למשחק</div><div class="small"><b>${esc(l.name)}</b></div></div></a>`).join('')}</div>
+    <div class="leaders">${d.leaders.map((l) => `<a class="card leader" href="#/player/${esc(l.code)}">${img(l.headshot)}<div><div class="val">${l.value}</div><div class="small muted">${STAT_HE[l.stat]} למשחק</div><div class="small"><b>${esc(l.name)}</b></div></div></a>`).join('')}</div>
     <div class="foot">אפליקציית אוהדים לא רשמית · נתונים: יורוליג, מנהלת ליגת העל ואתר מכבי · עודכן ${d.updatedAt ? fmtDate(d.updatedAt, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</div>`;
   renderFact();
 }
 
-const hotRow = (h) => `<a class="player-row" href="#/player/${h.code}">${img(h.headshot)}
+const hotRow = (h) => `<a class="player-row" href="#/player/${esc(h.code)}">${img(h.headshot)}
   <div class="info"><div class="name">${esc(h.name)} <span class="flame">🔥 +${h.delta}</span></div>
   <div class="trend">מדד <b>${h.recentPir}</b> לעומת ${h.seasonPir} בעונה · <b>${h.recentPts}</b> נק' לעומת ${h.seasonPts}</div>
   <div class="trend">${h.lastGames.map((g) => `${g.pts} נק' מול ${esc(g.opp)}`).join(' · ')}</div></div></a>`;
@@ -125,8 +126,8 @@ const hotRow = (h) => `<a class="player-row" href="#/player/${h.code}">${img(h.h
 function gameRow(g) {
   const opp = g.isHome ? g.away : g.home;
   const [us, them] = ourScore(g);
-  return `<a class="game-row" href="#/game/${g.id}">${crest(opp, 36)}
-    <div><div class="opp">${g.isHome ? '' : '@ '}${esc(opp.nameHe)}</div><div class="meta"><span class="comp comp-${g.comp}">${esc(g.compHe)}</span> ${dayDate(g.date)} · ${g.timeTBD ? 'שעה טרם נקבעה' : hour(g.date)}</div></div>
+  return `<a class="game-row" href="#/game/${esc(g.id)}">${crest(opp, 36)}
+    <div><div class="opp">${g.isHome ? '' : '@ '}${esc(opp.nameHe)}</div><div class="meta"><span class="comp comp-${esc(g.comp)}">${esc(g.compHe)}</span> ${dayDate(g.date)} · ${g.timeTBD ? 'שעה טרם נקבעה' : hour(g.date)}</div></div>
     <div class="res">${g.status === 'result' ? `<span dir="ltr">${us} - ${them}</span> ${resultBadge(g)}` : `<span class="meta">${g.isHome ? 'בית' : 'חוץ'}</span>`}</div></a>`;
 }
 
@@ -164,7 +165,7 @@ function absList(list) {
 }
 
 async function game(id) {
-  const d = await api(`games/${id}`);
+  const d = await api(`games/${esc(id)}`);
   const g = d.game;
   let html = `<a class="back" href="#/games">→ חזרה ללוח המשחקים</a>${matchCard(g, { link: false })}`;
   if (g.url) {
@@ -184,7 +185,7 @@ async function game(id) {
       <h2>⚔️ מפגשי עבר מול ${esc(p.opp.name)} <small>העונה ושתי העונות הקודמות</small></h2>
       <div class="card">${h.meetings.length ? `<div class="rec"><div class="w"><b>${h.record.won}</b><span class="small muted">ניצחונות מכבי</span></div><div class="l"><b>${h.record.lost}</b><span class="small muted">ניצחונות ${esc(p.opp.name)}</span></div></div>
       <div class="small muted" style="text-align:start">תוצאה: מכבי - יריבה</div>
-      ${h.meetings.map((m) => `<div class="h2h"><span><span class="badge ${m.win ? 'W' : 'L'}">${m.win ? 'נ' : 'ה'}</span> ${fmtDate(m.date, { day: 'numeric', month: 'numeric', year: 'numeric' })} · ${m.home ? 'בבית' : 'בחוץ'} · <span class="comp comp-${m.comp}">${esc(m.compHe)}</span></span><span class="sc" dir="ltr">${m.us} - ${m.them}</span></div>`).join('')}`
+      ${h.meetings.map((m) => `<div class="h2h"><span><span class="badge ${m.win ? 'W' : 'L'}">${m.win ? 'נ' : 'ה'}</span> ${fmtDate(m.date, { day: 'numeric', month: 'numeric', year: 'numeric' })} · ${m.home ? 'בבית' : 'בחוץ'} · <span class="comp comp-${esc(m.comp)}">${esc(m.compHe)}</span></span><span class="sc" dir="ltr">${m.us} - ${m.them}</span></div>`).join('')}`
       : '<div class="empty">אין מפגשים קודמים בעונות האחרונות</div>'}</div>
       ${h.lastMeetingTop?.overall ? `<h2>⭐ המוביל במפגש האחרון</h2><div class="card"><div class="mvp">${img(h.lastMeetingTop.overall.headshot, 'avatar lg')}<div><div class="big">${esc(h.lastMeetingTop.overall.name)}</div><div class="line">${esc(h.lastMeetingTop.overall.teamName)}</div><div class="line">${h.lastMeetingTop.overall.pts} נק' · ${h.lastMeetingTop.overall.reb} ריב' · ${h.lastMeetingTop.overall.ast} אס' · מדד ${h.lastMeetingTop.overall.pir}</div></div></div>
         ${h.lastMeetingTop.ours && h.lastMeetingTop.ours.code !== h.lastMeetingTop.overall.code ? `<div class="small muted" style="margin-top:8px">המצטיין של מכבי: <b>${esc(h.lastMeetingTop.ours.name)}</b> – ${h.lastMeetingTop.ours.pts} נק', מדד ${h.lastMeetingTop.ours.pir}</div>` : ''}</div>`
@@ -211,7 +212,7 @@ async function players() {
       const inner = `${p.headshot ? img(p.headshot) : `<div class="avatar num">${esc(String(Number(p.dorsal)))}</div>`}
         <div class="info"><div class="name">${esc(p.name)}${p.injury ? ' <span title="פצוע">🩹</span>' : ''}</div><div class="sub">#${esc(String(Number(p.dorsal)))}${p.positionHe ? ` · ${esc(p.positionHe)}` : ''} · ${games}</div></div>
         <div class="nums"><div><b>${p.pts ?? '-'}</b>נק'</div><div><b>${p.reb ?? '-'}</b>ריב'</div><div><b>${p.ast ?? '-'}</b>אס'</div><div><b>${p.pir ?? '-'}</b>מדד</div></div>`;
-      return p.code && playersComp !== 'league' ? `<a class="player-row" href="#/player/${p.code}">${inner}</a>` : `<div class="player-row">${inner}</div>`;
+      return p.code && playersComp !== 'league' ? `<a class="player-row" href="#/player/${esc(p.code)}">${inner}</a>` : `<div class="player-row">${inner}</div>`;
     };
     view.innerHTML = `<h2>שחקני מכבי <small>ממוצעים למשחק</small></h2>
       <div class="chips">${[['euroleague', 'יורוליג'], ['league', 'ליגת העל'], ['combined', 'משולב']].map(([k, l]) => `<button class="chip ${playersComp === k ? 'active' : ''}" data-c="${k}">${l}</button>`).join('')}</div>
@@ -228,7 +229,7 @@ async function players() {
 }
 
 async function player(code) {
-  const p = await api(`players/${code}`);
+  const p = await api(`players/${esc(code)}`);
   const age = p.birthDate ? Math.floor((Date.now() - new Date(p.birthDate)) / 31557600000) : null;
   view.innerHTML = `<a class="back" href="#/players">→ חזרה לשחקנים</a>
     <div class="card profile">${img(p.headshot, 'avatar lg')}<div><h1>${esc(p.name)}</h1>
@@ -242,7 +243,7 @@ async function player(code) {
       <div class="stat"><b>${p.threePct ?? '-'}%</b><span>מהשלוש</span></div><div class="stat"><b>${p.ftPct ?? '-'}%</b><span>מהעונשין</span></div></div>
     <h2>משחק אחר משחק</h2>
     <div class="card"><div class="table-wrap"><table><thead><tr><th style="text-align:start">יריבה</th><th>דק'</th><th>נק'</th><th>ריב'</th><th>אס'</th><th>מדד</th></tr></thead>
-    <tbody>${p.games.map((g) => `<tr><td class="team-cell"><a href="#/game/${g.gameCode}">${esc(g.oppName)}</a></td><td>${g.min}</td><td><b>${g.pts}</b></td><td>${g.reb}</td><td>${g.ast}</td><td>${g.pir}</td></tr>`).join('')}</tbody></table></div></div>`
+    <tbody>${p.games.map((g) => `<tr><td class="team-cell"><a href="#/game/${esc(g.gameCode)}">${esc(g.oppName)}</a></td><td>${g.min}</td><td><b>${g.pts}</b></td><td>${g.reb}</td><td>${g.ast}</td><td>${g.pir}</td></tr>`).join('')}</tbody></table></div></div>`
     : '<div class="card empty" style="margin-top:10px">עדיין לא שיחק ביורוליג העונה</div>'}`;
 }
 

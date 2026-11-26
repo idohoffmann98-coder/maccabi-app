@@ -13,6 +13,7 @@ const DURABLE = new Set(['subscriptions', 'injuries', 'vapid', 'notified']);
 
 const cache = new Map();
 let pool = null;
+export const dbConnected = () => !!pool;
 
 export async function initStore() {
   if (!process.env.DATABASE_URL) {
@@ -20,13 +21,18 @@ export async function initStore() {
     return;
   }
   const { default: pg } = await import('pg');
-  pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 3 });
-  await pool.query('CREATE TABLE IF NOT EXISTS kv (key text PRIMARY KEY, value jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())');
-  const { rows } = await pool.query('SELECT key, value FROM kv WHERE key = ANY($1)', [[...DURABLE]]);
+  // חיבור מוצפן עם בדיקת תעודה (Neon); sslmode=disable רק לבדיקות מקומיות
+  const url = new URL(process.env.DATABASE_URL);
+  const noSsl = url.searchParams.get('sslmode') === 'disable';
+  url.searchParams.delete('sslmode');
+  const p = new pg.Pool({ connectionString: url.toString(), ssl: noSsl ? false : { rejectUnauthorized: true }, max: 3 });
+  await p.query('CREATE TABLE IF NOT EXISTS kv (key text PRIMARY KEY, value jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())');
+  const { rows } = await p.query('SELECT key, value FROM kv WHERE key = ANY($1)', [[...DURABLE]]);
   for (const r of rows) {
     cache.set(r.key, r.value);
     writeFile(r.key, r.value);
   }
+  pool = p;
   console.log(`[store] מחובר למסד הנתונים (${rows.length} רשומות נטענו)`);
 }
 

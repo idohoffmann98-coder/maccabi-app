@@ -72,7 +72,7 @@ function parseGame(html, url) {
   const team = (t) => ({ name: t?.name || t?.shortName || '', short: t?.shortName || t?.name || '', logo: t?.logo || null });
   const status = d.status === 'FINISHED' ? 'result' : d.isLive ? 'live' : 'scheduled';
   return {
-    id: `mc${d.gameId}`,
+    id: `mc${String(d.gameId).replace(/\D/g, '')}`,
     url,
     competition: d.competition || '',
     comp: classify(d.competition),

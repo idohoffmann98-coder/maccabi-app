@@ -139,7 +139,7 @@ export function activeInjuries() {
       injury: n.injury,
       expectedReturn: n.duration,
       note: `לפי עדכון המועדון מ-${new Date(n.date).toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' })}`,
-      link: n.link,
+      link: /^https:\/\/maccabi\.co\.il\//.test(n.link || '') ? n.link : null,
       updatedAt: n.date,
       source: 'club',
     }));

@@ -25,10 +25,13 @@ export const publicKey = () => ensureKeys().publicKey;
 
 const subs = () => load('subscriptions', []);
 
+const MAX_SUBS = 2000;
 export function addSubscription(sub, prefs = {}) {
   const list = subs().filter((s) => s.sub.endpoint !== sub.endpoint);
+  if (list.length >= MAX_SUBS) return false;
   list.push({ sub, prefs: { start: prefs.start !== false, close: prefs.close !== false }, createdAt: new Date().toISOString() });
   save('subscriptions', list);
+  return true;
 }
 
 export function removeSubscription(endpoint) {

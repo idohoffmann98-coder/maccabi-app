@@ -14,6 +14,17 @@ const dir = path.join(config.dataDir, 'img');
 fs.mkdirSync(dir, { recursive: true });
 
 const inflight = new Map();
+const MAX_FILES = 3000;
+let made = { count: 0, reset: Date.now() + 60_000 };
+function canProduce() {
+  if (Date.now() > made.reset) made = { count: 0, reset: Date.now() + 60_000 };
+  if (++made.count > 120) return false; // עד 120 תמונות חדשות בדקה
+  try {
+    return fs.readdirSync(dir).length < MAX_FILES;
+  } catch {
+    return true;
+  }
+}
 
 // כתובת ציבורית של תמונה מוקטנת. התמונה נשמרת לפי הכתובת המקורית, כך שתמונה חדשה מקבלת כתובת חדשה.
 // kind: 'img' – תמונת שחקן (חיתוך ריבועי מלמעלה), 'logo' – סמל קבוצה (הקטנה בלי חיתוך)
@@ -77,7 +88,10 @@ export const imageHandler = (kind) => async (req, res) => {
     let body;
     if (fs.existsSync(file)) body = fs.readFileSync(file);
     else {
-      if (!inflight.has(file)) inflight.set(file, produce(src, w, file, kind).finally(() => inflight.delete(file)));
+      if (!inflight.has(file)) {
+        if (!canProduce()) throw new Error('busy');
+        inflight.set(file, produce(src, w, file, kind).finally(() => inflight.delete(file)));
+      }
       body = await inflight.get(file);
     }
     res.set({ 'content-type': 'image/webp', 'cache-control': 'public, max-age=2592000, immutable' });
