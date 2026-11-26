@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ניהול – צהוב-כחול</title>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    body { padding-bottom: 20px; }
+    label { display: block; font-size: 13px; font-weight: 700; margin: 10px 0 4px; }
+    input, select, textarea { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="brand"><span class="ball">🛠️</span><span>ניהול</span></div><a class="icon-btn" href="/" style="display:grid;place-items:center">🏠</a></header>
+  <main>
+    <div class="card">
+      <label for="token">טוקן ניהול</label>
+      <input id="token" type="password" placeholder="ADMIN_TOKEN" />
+      <div class="row"><button class="btn primary" id="load">כניסה</button><button class="btn" id="refresh">עדכון נתונים עכשיו</button><button class="btn" id="test">שליחת פוש ניסיון</button></div>
+      <p class="muted small" id="msg"></p>
+    </div>
+    <h2>עדכון פציעה</h2>
+    <div class="card">
+      <label for="player">שחקן</label><select id="player"></select>
+      <label for="injury">סוג הפציעה</label><input id="injury" placeholder="למשל: נקע בקרסול" />
+      <label for="ret">זמן חזרה משוער</label><input id="ret" placeholder="למשל: שבועיים / אחרי המחזור ה-20" />
+      <label for="note">הערה (לא חובה)</label><input id="note" placeholder="למשל: לפי דיווח באתר המועדון" />
+      <div class="row"><button class="btn primary" id="save">שמירה</button></div>
+    </div>
+    <h2>פציעות פעילות</h2>
+    <div class="card" id="list"><div class="empty">היכנסו עם טוקן כדי לראות</div></div>
+  </main>
+  <script type="module">
+    const $ = (id) => document.getElementById(id);
+    try { $('token').value = localStorage.getItem('adminToken') || ''; } catch {}
+    const call = async (path, body) => {
+      const r = await fetch(`/api/admin/${path}`, { method: body ? 'POST' : 'GET', headers: { 'content-type': 'application/json', 'x-admin-token': $('token').value }, body: body && JSON.stringify(body) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || r.status);
+      return j;
+    };
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+    const drawList = (inj) => {
+      $('list').innerHTML = inj.length ? inj.map((i) => `<div class="abs"><div style="flex:1"><b>${esc(i.playerName)}</b><div class="inj">${esc(i.injury)}${i.expectedReturn ? ' · ' + esc(i.expectedReturn) : ''}</div></div><button class="btn" data-c="${esc(i.playerCode)}">הסרה (חזר לשחק)</button></div>`).join('') : '<div class="empty">אין פציעות מסומנות</div>';
+      $('list').querySelectorAll('button').forEach((b) => (b.onclick = async () => drawList((await call('injuries', { playerCode: b.dataset.c, remove: true })).injuries)));
+    };
+    $('load').onclick = async () => {
+      try {
+        const d = await call('roster');
+        try { localStorage.setItem('adminToken', $('token').value); } catch {}
+        $('player').innerHTML = d.roster.map((p) => `<option value="${esc(p.code)}">${esc(p.nameHe)} (#${esc(p.dorsal)})</option>`).join('');
+        drawList(d.injuries);
+        $('msg').textContent = '✅ מחובר';
+      } catch (e) { $('msg').textContent = 'שגיאה: ' + e.message; }
+    };
+    $('save').onclick = async () => {
+      try {
+        const d = await call('injuries', { playerCode: $('player').value, injury: $('injury').value, expectedReturn: $('ret').value, note: $('note').value });
+        drawList(d.injuries);
+        $('msg').textContent = '✅ נשמר. התצוגה המקדימה של המשחק הבא עודכנה.';
+        $('injury').value = $('ret').value = $('note').value = '';
+      } catch (e) { $('msg').textContent = 'שגיאה: ' + e.message; }
+    };
+    $('refresh').onclick = async () => { $('msg').textContent = 'מעדכן…'; try { const d = await call('refresh', {}); $('msg').textContent = '✅ עודכן: ' + new Date(d.updatedAt).toLocaleString('he-IL'); } catch (e) { $('msg').textContent = 'שגיאה: ' + e.message; } };
+    $('test').onclick = async () => { try { const d = await call('test-push', {}); $('msg').textContent = `✅ נשלח ל-${d.sent} מכשירים`; } catch (e) { $('msg').textContent = 'שגיאה: ' + e.message; } };
+  </script>
+</body>
+</html>

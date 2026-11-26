@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>צהוב-כחול | אפליקציית אוהדים</title>
+  <meta name="description" content="אפליקציית אוהדים לא רשמית של מכבי תל אביב בכדורסל – סטטיסטיקה, משחקים וטבלת היורוליג" />
+  <meta name="theme-color" content="#0b1f5c" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="ball">🏀</span><span>צהוב-כחול</span></div>
+    <button id="bell" class="icon-btn" aria-label="התראות">🔔</button>
+  </header>
+  <main id="view" aria-live="polite"><div class="loading">טוען…</div></main>
+  <nav class="tabs">
+    <a href="#/" data-tab="home"><span>🏠</span>בית</a>
+    <a href="#/games" data-tab="games"><span>📅</span>משחקים</a>
+    <a href="#/players" data-tab="players"><span>👥</span>שחקנים</a>
+    <a href="#/standings" data-tab="standings"><span>🏆</span>טבלה</a>
+  </nav>
+  <dialog id="pushDialog">
+    <form method="dialog" class="sheet">
+      <h3>התראות פוש</h3>
+      <p class="muted" id="pushStatus"></p>
+      <label class="check"><input type="checkbox" id="prefStart" checked /> תחילת כל משחק</label>
+      <label class="check"><input type="checkbox" id="prefClose" checked /> סיום מותח (5 דקות אחרונות, הפרש קטן מ-10)</label>
+      <p class="muted small" id="iosHint" hidden>באייפון: קודם צריך להוסיף את האפליקציה למסך הבית (שיתוף ← "הוספה למסך הבית"), ולפתוח אותה משם.</p>
+      <div class="row">
+        <button type="button" id="pushOn" class="btn primary">הפעלת התראות</button>
+        <button type="button" id="pushOff" class="btn">כיבוי</button>
+        <button value="close" class="btn ghost">סגירה</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
