@@ -1,0 +1,22 @@
+# הגדרות הקמה ל-Render (חבילה חינמית).
+# ב-Render: New > Blueprint > בוחרים את הריפו, והשירות נוצר לפי הקובץ הזה.
+services:
+  - type: web
+    name: maccabi-app
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # סיסמה לעמוד הניהול /admin – נוצרת אוטומטית, ואפשר לראות אותה בלשונית Environment
+      - key: ADMIN_TOKEN
+        generateValue: true
+      # כתובת החיבור למסד הנתונים החינמי ב-Neon (מדביקים ב-Render, לא שומרים בקוד)
+      - key: DATABASE_URL
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:admin@example.com

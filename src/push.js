@@ -3,14 +3,25 @@ import webpush from 'web-push';
 import { config } from './config.js';
 import { load, save } from './store.js';
 
-let keys = load('vapid', null);
-if (!keys) {
-  keys = webpush.generateVAPIDKeys();
-  save('vapid', keys);
+// המפתחות נטענים בפעם הראשונה שצריך אותם (אחרי שהאחסון אותחל).
+// אפשר גם לקבוע אותם במשתני סביבה VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY.
+let keys = null;
+function ensureKeys() {
+  if (keys) return keys;
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    keys = { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY };
+  } else {
+    keys = load('vapid', null);
+    if (!keys) {
+      keys = webpush.generateVAPIDKeys();
+      save('vapid', keys);
+    }
+  }
+  webpush.setVapidDetails(config.vapidSubject, keys.publicKey, keys.privateKey);
+  return keys;
 }
-webpush.setVapidDetails(config.vapidSubject, keys.publicKey, keys.privateKey);
 
-export const publicKey = () => keys.publicKey;
+export const publicKey = () => ensureKeys().publicKey;
 
 const subs = () => load('subscriptions', []);
 
@@ -30,6 +41,7 @@ export function getPrefs(endpoint) {
 
 // kind: 'start' | 'close' | 'test'
 export async function sendPush(kind, payload) {
+  ensureKeys();
   const list = subs();
   const dead = [];
   let sent = 0;

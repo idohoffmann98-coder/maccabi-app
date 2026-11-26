@@ -9,6 +9,7 @@ import { dynamicFacts, STATIC_FACTS } from './facts.js';
 import { playerHe, POSITION_HE, teamHe } from './hebrew.js';
 import { addSubscription, getPrefs, publicKey, removeSubscription, sendPush } from './push.js';
 import { startScheduler } from './scheduler.js';
+import { initStore } from './store.js';
 import { hotPlayers, playerLogs, playersTable, teamAverages, teamSummary, topPerformer } from './stats.js';
 
 const TEAM = config.teamCode;
@@ -173,16 +174,29 @@ app.post('/api/admin/test-push', admin, async (req, res) => {
   res.json({ ok: true, sent: n });
 });
 
-app.get('/healthz', (req, res) => res.json({ ok: true, updatedAt: state().updatedAt }));
+app.get('/healthz', (req, res) => res.json({ ok: true, updatedAt: state().updatedAt, db: !!process.env.DATABASE_URL }));
 
 const pub = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'public');
 app.use(express.static(pub, { extensions: ['html'] }));
 
+// Render בחינם "מרדים" שרת אחרי 15 דקות בלי בקשות. השרת פונה לכתובת הציבורית של עצמו כל 10 דקות
+// כדי להישאר ער (Render מגדיר את RENDER_EXTERNAL_URL אוטומטית). אפשר להגדיר גם KEEPALIVE_URL.
+function keepAlive() {
+  const url = process.env.KEEPALIVE_URL || process.env.RENDER_EXTERNAL_URL;
+  if (!url) return;
+  console.log(`[keepalive] פינג כל 10 דקות ל-${url}`);
+  setInterval(() => {
+    fetch(new URL('/healthz', url), { signal: AbortSignal.timeout(20000) }).catch((e) => console.warn('[keepalive]', e.message));
+  }, 10 * 60 * 1000);
+}
+
 const start = async () => {
+  try { await initStore(); } catch (e) { console.error('[store] חיבור למסד הנתונים נכשל – ממשיך עם קבצים בלבד:', e.message); }
   if (!state().updatedAt || !ilState().updatedAt) {
     try { await fullRefresh('הפעלה ראשונה'); } catch (e) { console.error('refresh failed', e.message); }
   }
   app.listen(config.port, () => console.log(`🏀 השרת רץ על http://localhost:${config.port}`));
   if (process.env.NO_SCHEDULER !== '1') startScheduler();
+  keepAlive();
 };
 start();
