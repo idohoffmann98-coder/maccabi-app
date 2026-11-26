@@ -11,8 +11,11 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const fmtDate = (d, opts) => new Intl.DateTimeFormat('he-IL', { timeZone: TZ, ...opts }).format(new Date(d));
 const dayDate = (d) => fmtDate(d, { weekday: 'long', day: 'numeric', month: 'numeric' });
 const hour = (d) => fmtDate(d, { hour: '2-digit', minute: '2-digit' });
-const img = (src, cls = 'avatar', alt = '') => (src ? `<img class="${cls}" src="${esc(src)}" alt="${esc(alt)}" loading="lazy" />` : `<div class="${cls}"></div>`);
-const crest = (t, size = 52) => (t?.crest ? `<img src="${esc(t.crest)}" alt="" width="${size}" height="${size}" loading="lazy" />` : '');
+// תמונות עוברות דרך השרת שלנו: מוקטנות ונשמרות בזיכרון של הטלפון (ראו src/images.js)
+const b64url = (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const via = (src, w, kind = 'img') => (src && /^https?:/.test(src) ? `/${kind}/${w}/${b64url(src)}` : src);
+const img = (src, cls = 'avatar', alt = '') => (src ? `<img class="${cls}" src="${esc(via(src, cls.includes('lg') ? 192 : 96))}" alt="${esc(alt)}" loading="lazy" decoding="async" />` : `<div class="${cls}"></div>`);
+const crest = (t, size = 52) => (t?.crest ? `<img src="${esc(via(t.crest, size > 40 ? 96 : 48, 'logo'))}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" />` : '');
 const STAT_HE = { pts: 'נקודות', reb: 'ריבאונדים', ast: 'אסיסטים', pir: 'מדד' };
 
 function countdown(date) {
@@ -253,7 +256,7 @@ async function standings() {
       <div class="chips">${[['euroleague', 'יורוליג'], ['league', 'ליגת העל']].map(([k, l]) => `<button class="chip ${standingsComp === k ? 'active' : ''}" data-c="${k}">${l}</button>`).join('')}</div>
       <div class="card table-wrap"><table><thead><tr><th>#</th><th style="text-align:start">קבוצה</th><th>מש'</th><th>נ'</th><th>ה'</th><th>הפרש</th>${el ? '<th>כושר</th>' : "<th>נק'</th>"}</tr></thead>
       <tbody>${t.teams.map((x) => `<tr class="${x.us ? 'us' : ''} ${el ? (x.position <= 6 ? 'zone-po' : x.position <= 10 ? 'zone-pi' : '') : x.position <= 8 ? 'zone-po' : ''}">
-        <td>${x.position}</td><td class="team-cell"><div>${x.crest ? `<img src="${esc(x.crest)}" alt="" loading="lazy" />` : ''}${esc(x.nameHe)}</div></td>
+        <td>${x.position}</td><td class="team-cell"><div>${x.crest ? `<img src="${esc(via(x.crest, 48, 'logo'))}" alt="" loading="lazy" />` : ''}${esc(x.nameHe)}</div></td>
         <td>${x.played}</td><td>${x.won}</td><td>${x.lost}</td><td dir="ltr">${esc(x.diff)}</td><td>${el ? formBadges(x.form.slice(-3)) : x.points}</td></tr>`).join('')}</tbody></table>
       <div class="legend">${el ? '<span><i style="background:var(--win)"></i>פלייאוף (1-6)</span><span><i style="background:#e6a700"></i>פליי-אין (7-10)</span>' : '<span><i style="background:var(--win)"></i>פלייאוף (1-8)</span>'}</div></div>`;
     view.querySelectorAll('[data-c]').forEach((b) => (b.onclick = () => { standingsComp = b.dataset.c; draw(); }));

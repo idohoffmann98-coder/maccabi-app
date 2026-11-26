@@ -10,6 +10,7 @@ import { playerHe, POSITION_HE, teamHe } from './hebrew.js';
 import { addSubscription, getPrefs, publicKey, removeSubscription, sendPush } from './push.js';
 import { startScheduler } from './scheduler.js';
 import { initStore } from './store.js';
+import { imageHandler } from './images.js';
 import { hotPlayers, playerLogs, playersTable, teamAverages, teamSummary, topPerformer } from './stats.js';
 
 const TEAM = config.teamCode;
@@ -215,6 +216,9 @@ app.post('/api/admin/test-push', admin, async (req, res) => {
   const n = await sendPush('test', { title: '💛💙 התראת ניסיון', body: 'ההתראות עובדות! נעדכן אותך בתחילת כל משחק ובסיומים מותחים.', url: '/' });
   res.json({ ok: true, sent: n });
 });
+
+app.get('/img/:w/:key', imageHandler('img'));
+app.get('/logo/:w/:key', imageHandler('logo'));
 
 app.get('/healthz', (req, res) => res.json({ ok: true, updatedAt: state().updatedAt, db: !!process.env.DATABASE_URL }));
 

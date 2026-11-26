@@ -7,7 +7,7 @@
 import { config } from './config.js';
 import { load, save } from './store.js';
 import * as el from './euroleague.js';
-import { buildPreview, findGame, fullRefresh, nextGame, previews, state, refreshClub, refreshIsrael } from './data.js';
+import { buildPreview, findGame, fullRefresh, ilState, nextGame, previews, state, refreshClub, refreshIsrael } from './data.js';
 import { sendPush } from './push.js';
 
 const MIN = 60 * 1000;

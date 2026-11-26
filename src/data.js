@@ -8,6 +8,7 @@ import * as el from './euroleague.js';
 import * as il from './israel.js';
 import { fetchInjuryNews } from './injuries.js';
 import { clubGames, refreshClubGames } from './clubsite.js';
+import { warmImages } from './images.js';
 import { hasHebrew, playerHe, registerHebrew, teamHe } from './hebrew.js';
 import { absences, hotPlayers, topPerformer } from './stats.js';
 
@@ -185,7 +186,20 @@ export async function fullRefresh(reason = 'manual') {
   }
   syncHebrewNames();
   await refreshInjuries();
+  warmImages(imageList()).catch(() => {});
   return state();
+}
+
+// כל התמונות שהאפליקציה מציגה: שחקני מכבי (יורוליג וליגת העל) וסמלי הקבוצות
+function imageList() {
+  const items = [];
+  for (const p of state().roster) if (p.headshot) items.push({ src: p.headshot, w: 96, kind: 'img' }, { src: p.headshot, w: 192, kind: 'img' });
+  for (const p of ilState().roster || []) if (p.photo) items.push({ src: p.photo, w: 96, kind: 'img' });
+  const crests = new Set();
+  for (const g of allGames()) for (const t of [g.home, g.away]) if (t.crest) crests.add(t.crest);
+  for (const t of state().standings) if (t.crest) crests.add(t.crest);
+  for (const c of crests) items.push({ src: c, w: 96, kind: 'logo' }, { src: c, w: 48, kind: 'logo' });
+  return items;
 }
 
 // בעליית השרת: עונה פעילה לפי הנתונים השמורים (עד שהעדכון הראשון רץ)
