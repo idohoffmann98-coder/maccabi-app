@@ -1,5 +1,5 @@
 // Service worker: עבודה בסיסית אופליין + קבלת התראות פוש
-const CACHE = 'yb-v1';
+const CACHE = 'yb-v2';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.webmanifest', '/icons/icon.svg'];
 
 self.addEventListener('install', (e) => {

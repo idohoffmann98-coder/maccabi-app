@@ -1,12 +1,22 @@
 // הגדרות כלליות. אפשר לשנות דרך משתני סביבה.
-const now = new Date();
-const autoSeasonYear = now.getUTCMonth() >= 6 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+// העונה מחושבת בכל קריאה (ולא פעם אחת בעליית השרת), כך שהמעבר לעונה חדשה קורה לבד.
+// מאוגוסט מנסים את העונה החדשה; אם עוד אין לה לוח משחקים, נשארים בעונה הקודמת (ראו data.js).
+export const autoSeasonYear = () => {
+  const n = new Date();
+  return n.getUTCMonth() >= 7 ? n.getUTCFullYear() : n.getUTCFullYear() - 1;
+};
+let activeYear = null;
+export const setActiveSeasonYear = (y) => {
+  activeYear = y;
+};
 
 export const config = {
   port: Number(process.env.PORT || 3000),
   teamCode: process.env.TEAM_CODE || 'TEL',
   competition: 'E',
-  seasonYear: Number(process.env.SEASON_YEAR || autoSeasonYear),
+  get seasonYear() {
+    return Number(process.env.SEASON_YEAR) || activeYear || autoSeasonYear();
+  },
   // כמה עונות אחורה לחפש מפגשי עבר מול היריבה
   h2hSeasonsBack: Number(process.env.H2H_SEASONS || 2),
   // כמה שעות לפני משחק לבנות "תצוגה מקדימה" (פציעות, מפגשי עבר, שחקנים חמים)

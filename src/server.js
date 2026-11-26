@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'node:path';
 import { config } from './config.js';
 import {
-  activeInjuries, allGames, boxByCode, buildPreview, clearInjury, findGame, fullRefresh, ilState, injuries,
+  activeInjuries, allGames, restoreSeason, boxByCode, buildPreview, clearInjury, findGame, fullRefresh, ilState, injuries,
   lastGame, nextGame, previews, setInjury, state, unifiedRoster,
 } from './data.js';
 import { dynamicFacts, STATIC_FACTS } from './facts.js';
@@ -110,10 +110,38 @@ app.get('/api/games/:id', async (req, res) => {
   res.json({ game: strip(g), box, top, preview });
 });
 
+// ממוצעים משולבים (יורוליג + ליגת העל), משוקללים לפי מספר המשחקים בכל מפעל.
+// שחקנים מותאמים לפי מספר חולצה.
+function combinedPlayers(elPlayers, ilPlayers) {
+  const r1 = (n) => Math.round(n * 10) / 10;
+  const keys = ['min', 'pts', 'reb', 'ast', 'stl', 'tov', 'blk', 'pir'];
+  const out = [];
+  const used = new Set();
+  for (const p of elPlayers.filter((x) => x.onRoster || x.gp)) {
+    const ilp = ilPlayers.find((x) => Number(x.dorsal) === Number(p.dorsal));
+    if (ilp) used.add(ilp.playerId);
+    const g1 = p.gp || 0;
+    const g2 = ilp?.gp || 0;
+    const row = { ...p, gp: g1 + g2, gpEl: g1, gpLeague: g2 };
+    for (const k of keys) row[k] = g1 + g2 ? r1(((p[k] || 0) * g1 + (ilp?.[k] || 0) * g2) / (g1 + g2)) : null;
+    out.push(row);
+  }
+  for (const ilp of ilPlayers) {
+    if (used.has(ilp.playerId)) continue;
+    out.push({ ...ilp, code: null, gpEl: 0, gpLeague: ilp.gp });
+  }
+  return out;
+}
+
 app.get('/api/players', (req, res) => {
   const { players } = computed();
   const ilS = ilState();
-  res.json({ euroleague: players, league: ilS.players || [], leagueTeamAvg: ilS.teamAvg || null });
+  res.json({
+    euroleague: players,
+    league: ilS.players || [],
+    combined: combinedPlayers(players, ilS.players || []),
+    leagueTeamAvg: ilS.teamAvg || null,
+  });
 });
 
 app.get('/api/players/:code', (req, res) => {
@@ -191,6 +219,7 @@ function keepAlive() {
 }
 
 const start = async () => {
+  restoreSeason();
   try { await initStore(); } catch (e) { console.error('[store] חיבור למסד הנתונים נכשל – ממשיך עם קבצים בלבד:', e.message); }
   if (!state().updatedAt || !ilState().updatedAt) {
     try { await fullRefresh('הפעלה ראשונה'); } catch (e) { console.error('refresh failed', e.message); }

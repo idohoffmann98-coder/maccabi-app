@@ -53,6 +53,12 @@ const PLAYER_HE = {
   'KATTASH, ODED': 'עודד קטש',
 };
 
+// שחקן חדש שאין לו שם במילון מקבל אוטומטית את השם בעברית מאתר מנהלת הליגה (ראו data.js)
+export const hasHebrew = (name) => !!PLAYER_HE[name];
+export function registerHebrew(name, he) {
+  if (name && he && !PLAYER_HE[name]) PLAYER_HE[name] = he;
+}
+
 const cap = (s) => s.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
 
 export function playerHe(name) {

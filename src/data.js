@@ -2,12 +2,13 @@
 //  • יורוליג – ה-API הרשמי של היורוליג
 //  • ליגת העל, גביע ווינר וסופרקאפ – אתר מנהלת ליגת העל
 //  • פציעות – עדכוני המועדון באתר הרשמי של מכבי + עדכונים ידניים מעמוד הניהול
-import { config, seasonCode } from './config.js';
+import { autoSeasonYear, config, seasonCode, setActiveSeasonYear } from './config.js';
 import { load, save } from './store.js';
 import * as el from './euroleague.js';
 import * as il from './israel.js';
 import { fetchInjuryNews } from './injuries.js';
-import { playerHe, teamHe } from './hebrew.js';
+import { clubGames, refreshClubGames } from './clubsite.js';
+import { hasHebrew, playerHe, registerHebrew, teamHe } from './hebrew.js';
 import { absences, hotPlayers, topPerformer } from './stats.js';
 
 const TEAM = config.teamCode;
@@ -22,7 +23,7 @@ export const injuryNews = () => load('injuryNews', []); // אוטומטי מהא
 
 const bkey = (season, code) => `${season}_${code}`;
 
-export const COMP_HE = { euroleague: 'יורוליג', league: 'ליגת העל', cup: 'גביע ווינר', statecup: 'גביע המדינה', supercup: 'סופרקאפ', other: 'משחק' };
+export const COMP_HE = { euroleague: 'יורוליג', league: 'ליגת העל', cup: 'גביע ווינר', statecup: 'גביע המדינה', supercup: 'סופרקאפ', other: 'משחק הכנה' };
 
 async function ensureBoxscores(season, games) {
   const box = boxscores();
@@ -56,7 +57,8 @@ export async function refreshEuroleague() {
   const games = (await el.fetchTeamGames(season, TEAM)).sort((a, b) => a.date.localeCompare(b.date));
   const { players: roster, coach } = await el.fetchRoster(season, TEAM);
   await ensureBoxscores(season, games);
-  const lastRound = Math.max(0, ...games.filter((g) => g.status === 'result').map((g) => g.round || 0));
+  // הטבלה לפי המחזור האחרון של העונה הסדירה (בפלייאוף הטבלה כבר סופית)
+  const lastRound = Math.max(0, ...games.filter((g) => g.status === 'result' && (g.phase || 'RS') === 'RS').map((g) => g.round || 0));
   let standings = state().standings;
   if (lastRound) {
     try {
@@ -72,7 +74,12 @@ export async function refreshIsrael() {
   const prev = ilState();
   const year = il.ilYear();
   const teamId = (prev.year === year && prev.teamId) || (await il.findTeamId(year));
-  if (!teamId) throw new Error('לא נמצא מזהה קבוצה בליגת העל');
+  if (!teamId) {
+    // העונה החדשה בליגת העל עוד לא נפתחה באתר המנהלת – לא משאירים משחקים של העונה הקודמת
+    if (prev.year !== year) save('il', { year, teamId: null, games: [], roster: [], players: [], teamAvg: null, table: [], updatedAt: new Date().toISOString() });
+    console.log(`[data] ליגת העל: עונת ${year - 1}-${String(year).slice(2)} עוד לא פורסמה`);
+    return;
+  }
   const team = await il.fetchTeam(teamId, year);
   let table = prev.table;
   try {
@@ -138,12 +145,54 @@ export function activeInjuries() {
   return [...manual, ...auto];
 }
 
+// בוחר את העונה הפעילה: מאוגוסט מנסים את העונה החדשה, ואם עוד אין לה משחקים ביורוליג – העונה הקודמת
+async function resolveSeason() {
+  if (process.env.SEASON_YEAR) return Number(process.env.SEASON_YEAR);
+  const y = autoSeasonYear();
+  try {
+    const games = await el.fetchTeamGames(seasonCode(y), TEAM);
+    if (games.length) return y;
+  } catch {}
+  return y - 1;
+}
+
+export async function refreshClub() {
+  const y = config.seasonYear;
+  await refreshClubGames(`${y}-08-01`, `${y + 1}-07-31`);
+}
+
+// שחקנים שאין להם שם בעברית במילון מקבלים את השם מאתר המנהלת (התאמה לפי מספר חולצה)
+function syncHebrewNames() {
+  const ilr = ilState().roster || [];
+  for (const p of state().roster) {
+    if (hasHebrew(p.name)) continue;
+    const ilp = ilr.find((x) => Number(x.dorsal) === Number(p.dorsal));
+    if (ilp?.name) registerHebrew(p.name, ilp.name.replace(/^גבריאל /, ''));
+  }
+}
+
 export async function fullRefresh(reason = 'manual') {
-  console.log(`[data] עדכון מלא (${reason})`);
-  const results = await Promise.allSettled([refreshEuroleague(), refreshIsrael()]);
-  results.forEach((r, i) => r.status === 'rejected' && console.warn(`[data] ${i ? 'ליגת העל' : 'יורוליג'} נכשל:`, r.reason?.message));
+  const year = await resolveSeason();
+  const prevSeason = state().updatedAt ? state().season : null;
+  setActiveSeasonYear(year);
+  console.log(`[data] עדכון מלא (${reason}) – עונת ${year}-${String(year + 1).slice(2)}`);
+  const results = await Promise.allSettled([refreshEuroleague(), refreshIsrael(), refreshClub()]);
+  results.forEach((r, i) => r.status === 'rejected' && console.warn(`[data] ${['יורוליג', 'ליגת העל', 'אתר מכבי'][i]} נכשל:`, r.reason?.message));
+  if (prevSeason && prevSeason !== seasonCode(year)) {
+    console.log(`[data] מעבר עונה: ${prevSeason} → ${seasonCode(year)}`);
+    save('previews', {});
+    save('notified', {});
+  }
+  syncHebrewNames();
   await refreshInjuries();
   return state();
+}
+
+// בעליית השרת: עונה פעילה לפי הנתונים השמורים (עד שהעדכון הראשון רץ)
+export function restoreSeason() {
+  const s = state().season;
+  if (s && !process.env.SEASON_YEAR) setActiveSeasonYear(Number(s.slice(1)));
+  syncHebrewNames();
 }
 
 // ---------- לוח משחקים מאוחד ----------
@@ -184,8 +233,34 @@ export function ilToUnified(g) {
   };
 }
 
+const isMaccabiName = (n) => /מכבי\s*(Rapyd\s*)?תל[- ]אביב|מכבי ת"א/.test(n || '');
+export function clubToUnified(g) {
+  const home = isMaccabiName(g.home.name);
+  const tbd = !g.time || g.time === '00:00';
+  const side = (t, ours) => ({ code: ours ? TEAM : `mc${t.short}`, nameHe: ours ? 'מכבי תל אביב' : t.short || t.name, score: t.score, crest: t.logo });
+  return {
+    id: g.id,
+    comp: g.comp,
+    compHe: g.comp === 'other' ? (g.competition || COMP_HE.other).replace('משחקי הכנה', 'משחק הכנה') : COMP_HE[g.comp],
+    stage: g.phase || '',
+    date: il.israelToUTC(`${g.date}T${tbd ? '20:00' : g.time}:00`),
+    timeTBD: tbd,
+    status: g.status === 'result' ? 'result' : 'scheduled',
+    venue: g.venue,
+    isHome: home,
+    url: g.url,
+    home: side(g.home, home),
+    away: side(g.away, !home),
+    raw: g,
+  };
+}
+
+const ilDay = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
 export function allGames() {
   const list = [...state().games.map(elToUnified), ...(ilState().games || []).map(ilToUnified)];
+  // מאתר מכבי מוסיפים רק משחקים שלא קיימים כבר (גביע המדינה, משחקי הכנה וכו')
+  const days = new Set(list.map((g) => ilDay(g.date)));
+  for (const g of clubGames()) if (!days.has(g.date)) list.push(clubToUnified(g));
   return list.sort((a, b) => a.date.localeCompare(b.date));
 }
 

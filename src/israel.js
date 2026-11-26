@@ -180,7 +180,7 @@ export async function fetchTeam(teamId, year = ilYear()) {
 }
 
 // ממיר שעה מקומית בישראל ל-ISO ב-UTC (מתחשב בשעון קיץ)
-function israelToUTC(local) {
+export function israelToUTC(local) {
   const guess = new Date(`${local}Z`);
   const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jerusalem', hour: '2-digit', hour12: false });
   const ilHour = Number(fmt.format(guess));

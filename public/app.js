@@ -66,13 +66,13 @@ function pickFact() {
   try { localStorage.setItem('seenFacts', JSON.stringify(seen.slice(-Math.floor(facts.length * 0.8)))); } catch {}
   return facts[i];
 }
+let factOfVisit = null;
 function renderFact() {
-  const f = pickFact();
+  const f = (factOfVisit ||= pickFact());
   const el = document.getElementById('fact');
   if (!el || !f) return;
   el.innerHTML = `<div class="label">${f.kind === 'season' ? '📊 מהעונה הנוכחית' : '📜 מההיסטוריה'} · הידעת?</div>
-    <p>${esc(f.text)}</p><button id="nextFact">עוד עובדה ↻</button>`;
-  document.getElementById('nextFact').onclick = renderFact;
+    <p>${esc(f.text)}</p>`;
 }
 
 // ---------- מסכים ----------
@@ -159,7 +159,10 @@ async function game(id) {
   const d = await api(`games/${id}`);
   const g = d.game;
   let html = `<a class="back" href="#/games">→ חזרה ללוח המשחקים</a>${matchCard(g, { link: false })}`;
-  if (g.url) html += `<a class="cta" href="${esc(g.url)}" target="_blank" rel="noopener">${g.status === 'result' ? 'סטטיסטיקה מלאה באתר מנהלת הליגה ↗' : 'דף המשחק באתר מנהלת הליגה ↗'}</a>`;
+  if (g.url) {
+    const site = g.id.startsWith('mc') ? 'באתר מכבי' : 'באתר מנהלת הליגה';
+    html += `<a class="cta" href="${esc(g.url)}" target="_blank" rel="noopener">${g.status === 'result' ? `סטטיסטיקה מלאה ${site} ↗` : `דף המשחק ${site} ↗`}</a>`;
+  }
   if (d.box) {
     if (d.top?.overall) html += `<h2>⭐ השחקן המוביל במשחק</h2><div class="card"><div class="mvp">${img(d.top.overall.headshot, 'avatar lg')}<div><div class="big">${esc(d.top.overall.name)}</div><div class="line">${esc(d.top.overall.teamName)}</div><div class="line">${d.top.overall.pts} נק' · ${d.top.overall.reb} ריב' · ${d.top.overall.ast} אס' · מדד ${d.top.overall.pir}</div></div></div></div>`;
     html += `<h2>סטטיסטיקה</h2>${boxTable(d.box.home)}${boxTable(d.box.away)}`;
@@ -193,16 +196,18 @@ let playersComp = 'euroleague';
 async function players() {
   const d = await api('players');
   const draw = () => {
-    const src = playersComp === 'euroleague' ? d.euroleague.filter((p) => p.onRoster || p.gp) : d.league;
+    const src = playersComp === 'euroleague' ? d.euroleague.filter((p) => p.onRoster || p.gp) : playersComp === 'combined' ? d.combined : d.league;
     const rows = [...src].sort((a, b) => (b[playersSort] || 0) - (a[playersSort] || 0));
     const row = (p) => {
-      const inner = `${playersComp === 'euroleague' ? img(p.headshot) : `<div class="avatar num">${esc(String(Number(p.dorsal)))}</div>`}
-        <div class="info"><div class="name">${esc(p.name)}${p.injury ? ' <span title="פצוע">🩹</span>' : ''}</div><div class="sub">#${esc(String(Number(p.dorsal)))}${p.positionHe ? ` · ${esc(p.positionHe)}` : ''} · ${p.gp || 0} משחקים</div></div>
+      const games = playersComp === 'combined' ? `${p.gpEl || 0} יורוליג + ${p.gpLeague || 0} ליגה` : `${p.gp || 0} משחקים`;
+      const inner = `${p.headshot ? img(p.headshot) : `<div class="avatar num">${esc(String(Number(p.dorsal)))}</div>`}
+        <div class="info"><div class="name">${esc(p.name)}${p.injury ? ' <span title="פצוע">🩹</span>' : ''}</div><div class="sub">#${esc(String(Number(p.dorsal)))}${p.positionHe ? ` · ${esc(p.positionHe)}` : ''} · ${games}</div></div>
         <div class="nums"><div><b>${p.pts ?? '-'}</b>נק'</div><div><b>${p.reb ?? '-'}</b>ריב'</div><div><b>${p.ast ?? '-'}</b>אס'</div><div><b>${p.pir ?? '-'}</b>מדד</div></div>`;
-      return playersComp === 'euroleague' ? `<a class="player-row" href="#/player/${p.code}">${inner}</a>` : `<div class="player-row">${inner}</div>`;
+      return p.code && playersComp !== 'league' ? `<a class="player-row" href="#/player/${p.code}">${inner}</a>` : `<div class="player-row">${inner}</div>`;
     };
     view.innerHTML = `<h2>שחקני מכבי <small>ממוצעים למשחק</small></h2>
-      <div class="chips">${[['euroleague', 'יורוליג'], ['league', 'ליגת העל']].map(([k, l]) => `<button class="chip ${playersComp === k ? 'active' : ''}" data-c="${k}">${l}</button>`).join('')}</div>
+      <div class="chips">${[['euroleague', 'יורוליג'], ['league', 'ליגת העל'], ['combined', 'משולב']].map(([k, l]) => `<button class="chip ${playersComp === k ? 'active' : ''}" data-c="${k}">${l}</button>`).join('')}</div>
+      ${playersComp === 'combined' ? '<div class="small muted" style="margin:-4px 2px 10px">ממוצע משוקלל של משחקי היורוליג וליגת העל (לפי מספר המשחקים בכל מפעל)</div>' : ''}
       <div class="chips">${['pts', 'reb', 'ast', 'pir'].map((k) => `<button class="chip ${playersSort === k ? 'active' : ''}" data-s="${k}">${STAT_HE[k]}</button>`).join('')}</div>
       <div class="card">${rows.map(row).join('') || '<div class="empty">אין נתונים עדיין</div>'}</div>
       ${playersComp === 'league' && d.leagueTeamAvg ? `<h2>מכבי בליגת העל</h2><div class="stats-grid">

@@ -190,6 +190,7 @@ dialog::backdrop { background: rgba(5, 10, 30, .55); }
 .comp-euroleague { background: #ff7a00; color: #fff; }
 .comp-league { background: var(--blue); color: #fff; }
 .comp-cup, .comp-statecup, .comp-supercup { background: var(--yellow); color: #10184a; }
+.comp-other { background: #8a93ad; color: #fff; }
 .records { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
 .records b small { font-size: 12px; font-weight: 600; }
 .avatar.num { display: grid; place-items: center; font-weight: 900; font-size: 18px; color: var(--blue); background: var(--yellow); }

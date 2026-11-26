@@ -7,7 +7,7 @@
 import { config } from './config.js';
 import { load, save } from './store.js';
 import * as el from './euroleague.js';
-import { buildPreview, fullRefresh, nextGame, previews, state, refreshIsrael, ilState } from './data.js';
+import { buildPreview, findGame, fullRefresh, nextGame, previews, state, refreshClub, refreshIsrael } from './data.js';
 import { sendPush } from './push.js';
 
 const MIN = 60 * 1000;
@@ -69,12 +69,13 @@ async function tick() {
 
     const elapsed = now - tip;
 
-    // ---- משחק בליגה הישראלית: אין מקור תוצאה חיה, בודקים אם הסתיים מ-2 שעות אחרי הפתיחה ----
+    // ---- משחק שאינו יורוליג (ליגת העל, גביעים, הכנה): אין מקור תוצאה חיה,
+    //      בודקים אם הסתיים מ-2 שעות אחרי הפתיחה ----
     if (g.comp !== 'euroleague') {
       if (elapsed < 120 * MIN || now - lastPoll < 10 * MIN) return;
       lastPoll = now;
-      await refreshIsrael();
-      const updated = ilState().games.find((x) => x.id === g.id);
+      await (g.id.startsWith('il') ? refreshIsrael() : refreshClub());
+      const updated = findGame(g.id);
       if (updated?.status === 'result') {
         console.log(`[scheduler] משחק ${g.id} הסתיים – מעדכן נתונים`);
         await fullRefresh('אחרי משחק');
