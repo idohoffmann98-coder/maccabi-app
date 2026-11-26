@@ -460,7 +460,17 @@ export async function updateLineup(game) {
   const pv = all[game.id] || (await buildPreview(game));
   const prevCount = (pv.lineup?.ours?.length || 0) + (pv.lineup?.theirs?.length || 0);
   const prevStarters = pv.lineup?.ours?.filter((p) => p.starter).length || 0;
-  pv.lineup = { ours, theirs, startersKnown: ours.some((p) => p.starter), fetchedAt: new Date().toISOString() };
+  const nowIso = new Date().toISOString();
+  const startersKnown = ours.some((p) => p.starter);
+  pv.lineup = {
+    ours,
+    theirs,
+    startersKnown,
+    fetchedAt: nowIso,
+    // מתי הסגל והחמישייה הופיעו לראשונה (כדי לדעת כמה זמן לפני המשחק ה-API מפרסם אותם)
+    firstSeenAt: pv.lineup?.firstSeenAt || nowIso,
+    startersSeenAt: pv.lineup?.startersSeenAt || (startersKnown ? nowIso : null),
+  };
   all[game.id] = pv;
   save('previews', all);
   if (prevCount !== ours.length + theirs.length || prevStarters !== ours.filter((p) => p.starter).length) {
