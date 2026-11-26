@@ -10,6 +10,7 @@ import { playerHe, POSITION_HE, teamHe } from './hebrew.js';
 import { addSubscription, getPrefs, publicKey, removeSubscription, sendPush } from './push.js';
 import { startScheduler } from './scheduler.js';
 import { dbConnected, initStore } from './store.js';
+import { playoffsState } from './playoffs.js';
 import { imageHandler } from './images.js';
 import { adminGuard, cleanText, rateLimit, securityHeaders, validSubscription } from './security.js';
 import { hotPlayers, playerLogs, playersTable, teamAverages, teamSummary, topPerformer } from './stats.js';
@@ -134,16 +135,21 @@ function combinedPlayers(elPlayers, ilPlayers) {
   }
   for (const ilp of ilPlayers) {
     if (used.has(ilp.playerId)) continue;
-    out.push({ ...ilp, code: null, gpEl: 0, gpLeague: ilp.gp });
+    out.push({ ...ilp, code: ilp.code || `il${ilp.playerId}`, gpEl: 0, gpLeague: ilp.gp });
   }
   return out;
 }
 
 // שחקני ליגת העל עם התמונה מהסגל באתר המנהלת
+// כל שחקן ליגה מקבל קישור לדף שחקן: לפי מספר החולצה לשחקן היורוליג המתאים, ואם אין – דף ליגה בלבד (il<id>)
 function leaguePlayers() {
   const ilS = ilState();
   const photo = new Map((ilS.roster || []).map((r) => [r.playerId, r.photo]));
-  return (ilS.players || []).map((p) => ({ ...p, headshot: photo.get(p.playerId) || null }));
+  const elRoster = state().roster;
+  return (ilS.players || []).map((p) => {
+    const elp = elRoster.find((r) => Number(r.dorsal) === Number(p.dorsal));
+    return { ...p, headshot: photo.get(p.playerId) || null, code: elp?.code || `il${p.playerId}` };
+  });
 }
 
 // סמלי הקבוצות בליגת העל: מתוך לוח המשחקים של מכבי (מופיעות בו כל הקבוצות)
@@ -166,6 +172,13 @@ app.get('/api/players', (req, res) => {
 
 app.get('/api/players/:code', (req, res) => {
   const { s, box, players } = computed();
+  // שחקן שמשחק רק בליגת העל
+  if (/^il\d+$/.test(req.params.code)) {
+    const lp = leaguePlayers().find((x) => x.code === req.params.code);
+    if (!lp) return res.status(404).json({ error: 'לא נמצא' });
+    const r = (ilState().roster || []).find((x) => x.playerId === lp.playerId);
+    return res.json({ code: lp.code, name: lp.name, dorsal: lp.dorsal, headshot: lp.headshot, gp: 0, league: lp, leagueOnly: true, injury: null, games: [], ilPhoto: r?.photo || null });
+  }
   const p = players.find((x) => x.code === req.params.code);
   if (!p) return res.status(404).json({ error: 'לא נמצא' });
   const log = playerLogs(s.games, box, TEAM).get(p.code);
@@ -178,6 +191,7 @@ app.get('/api/standings', (req, res) => {
   const s = state();
   const ilS = ilState();
   res.json({
+    playoffs: { euroleague: playoffsState().euroleague, league: playoffsState().league },
     euroleague: { round: s.standingsRound, teams: s.standings.map((t) => ({ ...t, nameHe: teamHe(t.code, t.name), us: t.code === TEAM })) },
     league: { teams: (ilS.table || []).map((t) => ({ ...t, crest: t.crest || leagueCrests().get(t.teamId) || null, nameHe: /מכבי ת"א/.test(t.name) ? 'מכבי תל אביב' : t.name, us: /מכבי ת"א/.test(t.name) })) },
   });

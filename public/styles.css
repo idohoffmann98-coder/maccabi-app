@@ -196,3 +196,66 @@ dialog::backdrop { background: rgba(5, 10, 30, .55); }
 .avatar.num { display: grid; place-items: center; font-weight: 900; font-size: 18px; color: var(--blue); background: var(--yellow); }
 .abs a, .why a { color: var(--blue); font-weight: 700; }
 @media (prefers-color-scheme: dark) { .abs a, .why a { color: var(--yellow); } .comp-league { background: #3355cc; } }
+
+/* ---- פלייאוף ---- */
+.round-title { margin: 18px 2px 8px; font-size: 15px; font-weight: 800; color: var(--muted); }
+.series-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 560px) { .series-grid { grid-template-columns: 1fr 1fr; } }
+.series { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; box-shadow: var(--shadow); min-width: 0; }
+.series.ours { border: 2px solid var(--yellow); }
+.series-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+.sstatus.done { color: var(--win); }
+.srow { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.srow img, .srow .crest-ph { flex: none; }
+.srow .sname { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow .swins { font-size: 20px; font-weight: 900; min-width: 18px; text-align: center; }
+.srow.won .sname { font-weight: 900; }
+.srow.out { opacity: .5; }
+.srow.ours .sname { color: var(--blue); }
+.tick { color: var(--win); font-weight: 900; }
+.sgames { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.gchip { font-size: 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--text); white-space: nowrap; }
+.gchip.next { border-style: dashed; color: var(--muted); }
+.gchip .gnum { color: var(--muted); margin-inline-end: 4px; font-weight: 700; }
+a.gchip:hover { border-color: var(--blue); }
+.champ { margin: 4px 0 8px; padding: 14px; border-radius: 16px; text-align: center; font-size: 18px; font-weight: 900; background: var(--card); border: 1px solid var(--line); }
+.champ.ours { background: linear-gradient(135deg, var(--yellow), var(--yellow-2)); color: #10184a; border: 0; }
+@media (prefers-color-scheme: dark) { .srow.ours .sname { color: var(--yellow); } }
+.gchip { display: inline-flex; align-items: center; gap: 4px; }
+.gchip img, .gchip .crest-ph { width: 14px; height: 14px; }
+
+/* ---- עץ פלייאוף (מימין לשמאל: השלב הראשון מימין, הגמר משמאל) ---- */
+.bracket-wrap { overflow-x: auto; margin: 6px -4px 0; padding: 0 4px 6px; }
+.bheads, .bracket { display: flex; min-width: 330px; }
+.bheads > div { flex: 1; text-align: center; font-size: 11px; font-weight: 800; color: var(--muted); padding: 4px 0 6px; }
+.bracket { align-items: stretch; }
+.bround { flex: 1; display: flex; flex-direction: column; justify-content: space-around; min-width: 0; }
+.bpair { flex: 1; display: flex; flex-direction: column; position: relative; }
+.bslot { flex: 1; display: flex; align-items: center; padding: 6px 7px; position: relative; }
+.bmatch { position: relative; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); font-size: 12px; overflow: visible; }
+.bmatch.ours { border: 2px solid var(--yellow); }
+.bmatch.empty { border-style: dashed; box-shadow: none; background: transparent; color: var(--muted); }
+.bteam { display: flex; align-items: center; gap: 5px; padding: 5px 7px; min-width: 0; }
+.bteam + .bteam { border-top: 1px solid var(--line); }
+.bteam .bname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.bteam b { font-size: 14px; font-weight: 900; }
+.bteam.won .bname { font-weight: 900; }
+.bteam.out { opacity: .45; }
+.bteam.ours .bname { color: var(--blue); }
+@media (prefers-color-scheme: dark) { .bteam.ours .bname { color: var(--yellow); } }
+.bteam img, .bteam .crest-ph { width: 18px; height: 18px; flex: none; font-size: 8px; }
+/* קווי חיבור: מכל משבצת יוצא קו אל העמודה הבאה (בצד שמאל, inline-end), וקו אנכי מחבר כל זוג */
+.bround:not(.last) .bslot::after { content: ''; position: absolute; top: 50%; inset-inline-end: 0; width: 7px; border-top: 2px solid var(--line); }
+.bpair::after { content: ''; position: absolute; top: 25%; bottom: 25%; inset-inline-end: 0; border-inline-end: 2px solid var(--line); }
+.bround:not(.first) .bslot::before { content: ''; position: absolute; top: 50%; inset-inline-start: 0; width: 7px; border-top: 2px solid var(--line); }
+.pi-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.po-details { margin-top: 14px; }
+.po-details summary { cursor: pointer; font-weight: 700; color: var(--blue); padding: 8px 2px; }
+@media (prefers-color-scheme: dark) { .po-details summary { color: var(--yellow); } }
+/* שמות בעץ: גלישה לשתי שורות במקום חיתוך, כדי שאפשר יהיה להבחין בין "הפועל ת"א" ל"הפועל י-ם" */
+.bteam { padding: 5px 6px; gap: 4px; align-items: center; }
+.bteam .bname { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.15; font-size: 11.5px; }
+.bteam img, .bteam .crest-ph { width: 16px; height: 16px; }
+.bslot { padding: 5px 6px; }
+.bround:not(.last) .bslot::after, .bround:not(.first) .bslot::before { width: 6px; border-top-color: var(--muted); opacity: .55; }
+.bpair::after { border-inline-end-color: var(--muted); opacity: .55; }

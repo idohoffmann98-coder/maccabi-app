@@ -9,6 +9,7 @@ import * as il from './israel.js';
 import { fetchInjuryNews } from './injuries.js';
 import { clubGames, refreshClubGames } from './clubsite.js';
 import { warmImages } from './images.js';
+import { refreshPlayoffs } from './playoffs.js';
 import { hasHebrew, playerHe, registerHebrew, teamHe } from './hebrew.js';
 import { absences, hotPlayers, topPerformer } from './stats.js';
 
@@ -177,8 +178,8 @@ export async function fullRefresh(reason = 'manual') {
   const prevSeason = state().updatedAt ? state().season : null;
   setActiveSeasonYear(year);
   console.log(`[data] עדכון מלא (${reason}) – עונת ${year}-${String(year + 1).slice(2)}`);
-  const results = await Promise.allSettled([refreshEuroleague(), refreshIsrael(), refreshClub()]);
-  results.forEach((r, i) => r.status === 'rejected' && console.warn(`[data] ${['יורוליג', 'ליגת העל', 'אתר מכבי'][i]} נכשל:`, r.reason?.message));
+  const results = await Promise.allSettled([refreshEuroleague(), refreshIsrael(), refreshClub(), refreshPlayoffs()]);
+  results.forEach((r, i) => r.status === 'rejected' && console.warn(`[data] ${['יורוליג', 'ליגת העל', 'אתר מכבי', 'פלייאוף'][i]} נכשל:`, r.reason?.message));
   if (prevSeason && prevSeason !== seasonCode(year)) {
     console.log(`[data] מעבר עונה: ${prevSeason} → ${seasonCode(year)}`);
     save('previews', {});
@@ -215,7 +216,7 @@ export function elToUnified(g) {
     id: `el${g.code}`,
     comp: 'euroleague',
     compHe: COMP_HE.euroleague,
-    stage: g.roundName?.replace('Round', 'מחזור') || '',
+    stage: { PI: 'פליי-אין', PO: 'פלייאוף', FF: 'פיינל פור' }[g.phase] || g.roundName?.replace('Round', 'מחזור') || '',
     date: g.date,
     status: g.status,
     venue: g.venue,

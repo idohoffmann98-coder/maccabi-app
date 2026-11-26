@@ -189,3 +189,47 @@ export function israelToUTC(local) {
 }
 
 export const isOurs = (name) => name === TEAM_NAME;
+
+// ---- פלייאוף: כל המשחקים בכל שלבי הפלייאוף (כל הקבוצות, לא רק מכבי) ----
+// באתר המנהלת לכל שלב יש "לוח" (Board) משלו, ושמות הלוחות נלקחים מתפריט הבחירה בדף התוצאות.
+const PLAYOFF_RE = /פליי-אין|רבע הגמר|רבע גמר|חצי גמר|חצי הגמר|סדרת הגמר|פיינל פור|גמר/;
+const NOT_PLAYOFF_RE = /גביע|סופרקאפ/;
+
+export async function fetchPlayoffs(year = ilYear()) {
+  const html = await getHTML(`${BASE}/results.asp?cYear=${year}&Board=5&RoundNumber=0&TeamId=0`);
+  const sel = html.match(/<select[^>]*name="Board"[^>]*>([\s\S]*?)<\/select>/)?.[1] || '';
+  const boards = [...sel.matchAll(/<option[^>]*value="(\d+)"[^>]*>([^<]*)/g)]
+    .map((m) => ({ id: m[1], name: decode(m[2]).replace(/^ליגת Winner סל\s*-\s*/, '').trim() }))
+    .filter((b) => b.id !== '0' && PLAYOFF_RE.test(b.name) && !NOT_PLAYOFF_RE.test(b.name));
+  const rounds = [];
+  for (const b of boards) {
+    const page = await getHTML(`${BASE}/results.asp?cYear=${year}&Board=${b.id}&RoundNumber=0&TeamId=0`);
+    const games = [];
+    for (const r of rowsOf(page)) {
+      const gameId = r.match(/GameId=(\d+)/)?.[1];
+      const ids = [...r.matchAll(/TeamId=(\d+)/g)].map((x) => x[1]);
+      if (!gameId || ids.length < 2) continue;
+      const c = cellsOf(r);
+      const [d, m, y] = (text(c[0] || '').match(/(\d{2})\/(\d{2})\/(\d{4})/) || []).slice(1);
+      if (!d) continue;
+      const time = text(c[1] || '').match(/\d{2}:\d{2}/)?.[0];
+      const teamCells = c.filter((x) => /TeamId=/.test(x));
+      const team = (cell, id) => ({
+        teamId: id,
+        name: text(cell.match(/class="game_item mid mobileOnly">([\s\S]*?)<\/div>/)?.[1] || cell.match(/alt="([^"]*)"/)?.[1] || ''),
+        crest: (() => { const s = cell.match(/<img[^>]+src="([^"]+)"/)?.[1]; return s ? new URL(s, BASE).href : null; })(),
+      });
+      const sc = text(c[c.length - 1] || '').match(/(\d+)\s*-\s*(\d+)/);
+      games.push({
+        gameId,
+        date: israelToUTC(`${y}-${m}-${d}T${time || '20:00'}:00`),
+        home: { ...team(teamCells[0] || '', ids[0]), score: sc ? Number(sc[2]) : null },
+        away: { ...team(teamCells[1] || '', ids[1]), score: sc ? Number(sc[1]) : null },
+        status: sc ? 'result' : 'scheduled',
+        url: `${BASE}/game-zone.asp?GameId=${gameId}`,
+      });
+    }
+    if (games.length) rounds.push({ name: b.name, games });
+  }
+  return rounds;
+}

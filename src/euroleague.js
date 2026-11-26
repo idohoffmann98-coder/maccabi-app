@@ -134,3 +134,9 @@ export function normalizeGame(g) {
 export const isFinished = (g) => g.status === 'result';
 export const isScheduled = (g) => ['confirmed', 'scheduled', 'pending', 'postponed'].includes(g.status);
 export const isLive = (g) => !isFinished(g) && !isScheduled(g);
+
+// משחקי שלב מסוים בעונה (כל הקבוצות): PI = פליי-אין, PO = פלייאוף, FF = פיינל פור
+export async function fetchPhaseGames(season, phase) {
+  const j = await getJSON(`${V2}/${c}/seasons/${season}/games?phaseTypeCode=${phase}&limit=100`);
+  return (j.data || []).map((g) => ({ ...normalizeGame(g), group: g.group?.name || '' }));
+}

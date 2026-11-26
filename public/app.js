@@ -212,7 +212,7 @@ async function players() {
       const inner = `${p.headshot ? img(p.headshot) : `<div class="avatar num">${esc(String(Number(p.dorsal)))}</div>`}
         <div class="info"><div class="name">${esc(p.name)}${p.injury ? ' <span title="פצוע">🩹</span>' : ''}</div><div class="sub">#${esc(String(Number(p.dorsal)))}${p.positionHe ? ` · ${esc(p.positionHe)}` : ''} · ${games}</div></div>
         <div class="nums"><div><b>${p.pts ?? '-'}</b>נק'</div><div><b>${p.reb ?? '-'}</b>ריב'</div><div><b>${p.ast ?? '-'}</b>אס'</div><div><b>${p.pir ?? '-'}</b>מדד</div></div>`;
-      return p.code && playersComp !== 'league' ? `<a class="player-row" href="#/player/${esc(p.code)}">${inner}</a>` : `<div class="player-row">${inner}</div>`;
+      return p.code ? `<a class="player-row" href="#/player/${esc(p.code)}">${inner}</a>` : `<div class="player-row">${inner}</div>`;
     };
     view.innerHTML = `<h2>שחקני מכבי <small>ממוצעים למשחק</small></h2>
       <div class="chips">${[['euroleague', 'יורוליג'], ['league', 'ליגת העל'], ['combined', 'משולב']].map(([k, l]) => `<button class="chip ${playersComp === k ? 'active' : ''}" data-c="${k}">${l}</button>`).join('')}</div>
@@ -235,8 +235,13 @@ async function player(code) {
     <div class="card profile">${img(p.headshot, 'avatar lg')}<div><h1>${esc(p.name)}</h1>
       <div class="muted">#${esc(p.dorsal)} · ${esc(p.positionHe || '')}${age ? ` · גיל ${age}` : ''}${p.height ? ` · ${p.height} ס"מ` : ''}</div>
       ${p.injury ? `<div class="inj" style="color:var(--loss);font-weight:700;margin-top:4px">🩹 ${esc(p.injury.injury)}${p.injury.expectedReturn ? ` · היעדרות: ${esc(p.injury.expectedReturn)}` : ''}</div>` : ''}</div></div>
-    ${p.league ? `<h2>ליגת העל <small>${p.league.gp} משחקים</small></h2><div class="stats-grid"><div class="stat"><b>${p.league.pts}</b><span>נקודות</span></div><div class="stat"><b>${p.league.reb}</b><span>ריבאונדים</span></div><div class="stat"><b>${p.league.ast}</b><span>אסיסטים</span></div><div class="stat"><b>${p.league.pir}</b><span>מדד</span></div></div><h2>יורוליג</h2>` : ''}
-    ${p.gp ? `<div class="stats-grid" style="margin-top:10px">
+    ${p.league ? `<h2>ליגת העל <small>${num(p.league.gp)} משחקים</small></h2><div class="stats-grid">
+      <div class="stat"><b>${num(p.league.pts)}</b><span>נקודות</span></div><div class="stat"><b>${num(p.league.reb)}</b><span>ריבאונדים</span></div>
+      <div class="stat"><b>${num(p.league.ast)}</b><span>אסיסטים</span></div><div class="stat"><b>${num(p.league.pir)}</b><span>מדד</span></div>
+      <div class="stat"><b>${num(p.league.min)}</b><span>דקות</span></div><div class="stat"><b>${num(p.league.fg2Pct)}%</b><span>מ-2</span></div>
+      <div class="stat"><b>${num(p.league.threePct)}%</b><span>מהשלוש</span></div><div class="stat"><b>${num(p.league.ftPct)}%</b><span>מהעונשין</span></div></div>
+      ${p.leagueOnly ? '' : '<h2>יורוליג</h2>'}` : ''}
+    ${p.leagueOnly ? '' : p.gp ? `<div class="stats-grid" style="margin-top:10px">
       <div class="stat"><b>${p.pts}</b><span>נקודות</span></div><div class="stat"><b>${p.reb}</b><span>ריבאונדים</span></div>
       <div class="stat"><b>${p.ast}</b><span>אסיסטים</span></div><div class="stat"><b>${p.pir}</b><span>מדד</span></div>
       <div class="stat"><b>${p.min}</b><span>דקות</span></div><div class="stat"><b>${p.fgPct ?? '-'}%</b><span>מהשדה</span></div>
@@ -248,19 +253,122 @@ async function player(code) {
 }
 
 let standingsComp = 'euroleague';
+let standingsView = 'playoffs';
+
+// כרטיס סדרת פלייאוף
+function seriesCard(sr) {
+  const byCode = Object.fromEntries(sr.teams.map((t) => [t.code, t]));
+  const played = sr.games.filter((g) => g.status === 'result');
+  const status = sr.decided ? 'הוכרעה' : sr.leader ? `${byCode[sr.leader].name} מובילה` : played.length ? 'שוויון' : 'טרם החלה';
+  const row = (t) => `<div class="srow ${sr.winner === t.code ? 'won' : sr.decided ? 'out' : ''} ${t.ours ? 'ours' : ''}">
+      ${crest({ crest: t.crest, nameHe: t.name, code: t.ours ? TEAM : '' }, 26)}<span class="sname">${esc(t.name)}</span>
+      <b class="swins">${num(t.wins)}</b>${sr.winner === t.code ? '<span class="tick" aria-label="עלתה">✓</span>' : ''}</div>`;
+  const chip = (g, i) => {
+    const hs = num(g.homeScore), as = num(g.awayScore);
+    const done = g.status === 'result';
+    const w = done ? byCode[hs > as ? g.home : g.away] : null;
+    const label = done ? `${w ? crest({ crest: w.crest, nameHe: w.name, code: w.ours ? TEAM : '' }, 14) : ''}<span dir="ltr">${Math.max(hs, as)}-${Math.min(hs, as)}</span>` : fmtDate(g.date, { day: 'numeric', month: 'numeric' });
+    const href = sr.ours ? `#/game/${esc(g.id)}` : g.url && /^https:\/\//.test(g.url) ? esc(g.url) : null;
+    const inner = `<span class="gnum">${sr.games.length > 1 ? `מ${i + 1}` : ''}</span>${label}`;
+    return href ? `<a class="gchip ${done ? '' : 'next'}" href="${href}"${href.startsWith('http') ? ' target="_blank" rel="noopener"' : ''}>${inner}</a>` : `<span class="gchip ${done ? '' : 'next'}">${inner}</span>`;
+  };
+  return `<div class="series ${sr.ours ? 'ours' : ''}">
+    <div class="series-head"><span>${esc(sr.label || '')}</span><span class="sstatus ${sr.decided ? 'done' : ''}">${esc(status)}</span></div>
+    ${sr.teams.map(row).join('')}
+    <div class="sgames">${sr.games.map(chip).join('')}</div></div>`;
+}
+
+// ---- עץ פלייאוף ----
+// שלבי העץ: סדרות פלייאוף / רבע גמר → חצי גמר → גמר. פליי-אין ומקום 3 מוצגים בנפרד.
+function treeRounds(rounds) {
+  const out = [];
+  for (const r of rounds) {
+    if (r.key === 'pi' || /פליי-אין/.test(r.name)) continue;
+    if (r.key === 'ff') {
+      const semis = r.series.filter((sr) => sr.label === 'חצי גמר');
+      const fin = r.series.filter((sr) => sr.label === 'גמר');
+      if (semis.length) out.push({ name: 'חצי גמר', series: semis });
+      if (fin.length) out.push({ name: 'גמר', series: fin });
+      continue;
+    }
+    out.push({ name: r.name.replace(/\s*\(.*\)/, '').replace(/^סדרת /, ''), series: r.series });
+  }
+  // משבצות ריקות לשלבים שעוד לא נקבעו (עד הגמר)
+  const names = { 2: 'חצי גמר', 1: 'גמר' };
+  while (out.length && out[out.length - 1].series.length > 1) {
+    const n = Math.ceil(out[out.length - 1].series.length / 2);
+    out.push({ name: names[n] || 'שלב הבא', series: Array.from({ length: n }, () => null) });
+  }
+  // סידור: הסדרות שמזינות כל משבצת בשלב הבא יושבות אחת ליד השנייה
+  for (let i = out.length - 2; i >= 0; i--) {
+    const next = out[i + 1].series;
+    const cur = [...out[i].series];
+    const ordered = [];
+    for (const nx of next) {
+      if (!nx) continue;
+      const codes = new Set(nx.teams.map((t) => t.code));
+      for (const sr of cur.filter((c) => c && c.teams.some((t) => codes.has(t.code)))) {
+        ordered.push(sr);
+        cur.splice(cur.indexOf(sr), 1);
+      }
+    }
+    out[i].series = [...ordered, ...cur];
+  }
+  return out;
+}
+
+function bracketMatch(sr) {
+  if (!sr) return `<div class="bmatch empty"><div class="bteam"><span class="bname">?</span></div><div class="bteam"><span class="bname">?</span></div></div>`;
+  const row = (t) => `<div class="bteam ${sr.winner === t.code ? 'won' : sr.decided ? 'out' : ''} ${t.ours ? 'ours' : ''}">
+    ${crest({ crest: t.crest, nameHe: t.name, code: t.ours ? TEAM : '' }, 18)}<span class="bname">${esc(t.name)}</span><b>${num(t.wins)}</b></div>`;
+  return `<div class="bmatch ${sr.ours ? 'ours' : ''}">${sr.teams.map(row).join('')}</div>`;
+}
+
+function bracketView(tree) {
+  const col = (r, i) => {
+    const slots = r.series.map((sr) => `<div class="bslot">${bracketMatch(sr)}</div>`);
+    const body = i < tree.length - 1 && slots.length > 1
+      ? Array.from({ length: Math.ceil(slots.length / 2) }, (_, k) => `<div class="bpair">${slots.slice(k * 2, k * 2 + 2).join('')}</div>`).join('')
+      : slots.join('');
+    return `<div class="bround ${i === 0 ? 'first' : ''} ${i === tree.length - 1 ? 'last' : ''}">${body}</div>`;
+  };
+  return `<div class="bracket-wrap"><div class="bheads">${tree.map((r) => `<div>${esc(r.name)}</div>`).join('')}</div>
+    <div class="bracket">${tree.map(col).join('')}</div></div>`;
+}
+
+function playoffsView(rounds) {
+  const tree = treeRounds(rounds);
+  const fin = tree[tree.length - 1]?.series[0];
+  const champ = fin?.winner ? fin.teams.find((t) => t.code === fin.winner) : null;
+  const extra = rounds.filter((r) => r.key === 'pi' || /פליי-אין/.test(r.name));
+  const third = rounds.flatMap((r) => r.series.filter((sr) => /מקום 3/.test(sr.label || '')));
+  return `${champ ? `<div class="champ ${champ.ours ? 'ours' : ''}">🏆 ${champ.ours ? 'מכבי תל אביב אלופה!' : `האלופה: ${esc(champ.name)}`}</div>` : ''}
+    ${extra.map((r) => `<h3 class="round-title">${esc(r.name)}</h3><div class="pi-row">${r.series.map(bracketMatch).join('')}</div>`).join('')}
+    ${tree.length ? bracketView(tree) : ''}
+    ${third.length ? `<h3 class="round-title">משחק על מקום 3</h3><div class="pi-row">${third.map(bracketMatch).join('')}</div>` : ''}
+    <details class="po-details"><summary>תוצאות כל המשחקים בסדרות</summary>
+      ${rounds.map((r) => `<h3 class="round-title">${esc(r.name)}</h3><div class="series-grid">${r.series.map(seriesCard).join('')}</div>`).join('')}
+    </details>`;
+}
+
 async function standings() {
   const d = await api('standings');
   const draw = () => {
     const el = standingsComp === 'euroleague';
     const t = el ? d.euroleague : d.league;
-    view.innerHTML = `<h2>${el ? 'טבלת היורוליג' : 'טבלת ליגת העל'} <small>${el ? `אחרי מחזור ${t.round}` : ''}</small></h2>
-      <div class="chips">${[['euroleague', 'יורוליג'], ['league', 'ליגת העל']].map(([k, l]) => `<button class="chip ${standingsComp === k ? 'active' : ''}" data-c="${k}">${l}</button>`).join('')}</div>
-      <div class="card table-wrap"><table><thead><tr><th>#</th><th style="text-align:start">קבוצה</th><th>מש'</th><th>נ'</th><th>ה'</th><th>הפרש</th>${el ? '<th>כושר</th>' : "<th>נק'</th>"}</tr></thead>
+    const po = d.playoffs?.[standingsComp];
+    const showPo = po && po.length && standingsView === 'playoffs';
+    const table = `<div class="card table-wrap"><table><thead><tr><th>#</th><th style="text-align:start">קבוצה</th><th>מש'</th><th>נ'</th><th>ה'</th><th>הפרש</th>${el ? '<th>כושר</th>' : "<th>נק'</th>"}</tr></thead>
       <tbody>${t.teams.map((x) => `<tr class="${x.us ? 'us' : ''} ${el ? (x.position <= 6 ? 'zone-po' : x.position <= 10 ? 'zone-pi' : '') : x.position <= 8 ? 'zone-po' : ''}">
-        <td>${x.position}</td><td class="team-cell"><div>${x.crest ? `<img src="${esc(via(x.crest, 48, 'logo'))}" alt="" loading="lazy" />` : ''}${esc(x.nameHe)}</div></td>
-        <td>${x.played}</td><td>${x.won}</td><td>${x.lost}</td><td dir="ltr">${esc(x.diff)}</td><td>${el ? formBadges(x.form.slice(-3)) : x.points}</td></tr>`).join('')}</tbody></table>
+        <td>${num(x.position)}</td><td class="team-cell"><div>${x.crest ? `<img src="${esc(via(x.crest, 48, 'logo'))}" alt="" loading="lazy" />` : ''}${esc(x.nameHe)}</div></td>
+        <td>${num(x.played)}</td><td>${num(x.won)}</td><td>${num(x.lost)}</td><td dir="ltr">${esc(x.diff)}</td><td>${el ? formBadges(x.form.slice(-3)) : num(x.points)}</td></tr>`).join('')}</tbody></table>
       <div class="legend">${el ? '<span><i style="background:var(--win)"></i>פלייאוף (1-6)</span><span><i style="background:#e6a700"></i>פליי-אין (7-10)</span>' : '<span><i style="background:var(--win)"></i>פלייאוף (1-8)</span>'}</div></div>`;
+    view.innerHTML = `<h2>${el ? 'יורוליג' : 'ליגת העל'} <small>${showPo ? 'פלייאוף' : el && t.round ? `עונה סדירה · אחרי מחזור ${num(t.round)}` : 'עונה סדירה'}</small></h2>
+      <div class="chips">${[['euroleague', 'יורוליג'], ['league', 'ליגת העל']].map(([k, l]) => `<button class="chip ${standingsComp === k ? 'active' : ''}" data-c="${k}">${l}</button>`).join('')}</div>
+      ${po && po.length ? `<div class="chips">${[['playoffs', '🏆 פלייאוף'], ['table', 'עונה סדירה']].map(([k, l]) => `<button class="chip ${standingsView === k ? 'active' : ''}" data-v="${k}">${l}</button>`).join('')}</div>` : ''}
+      ${showPo ? playoffsView(po) : table}`;
     view.querySelectorAll('[data-c]').forEach((b) => (b.onclick = () => { standingsComp = b.dataset.c; draw(); }));
+    view.querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => { standingsView = b.dataset.v; draw(); }));
   };
   draw();
 }
