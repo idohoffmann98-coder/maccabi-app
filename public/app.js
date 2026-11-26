@@ -79,6 +79,11 @@ function renderFact() {
 async function home() {
   const [d, f] = await Promise.all([api('home'), facts.length ? facts : api('facts')]);
   facts = f;
+  if (!d.updatedAt) {
+    view.innerHTML = '<div class="card empty">⏳ השרת אוסף עכשיו את הנתונים העדכניים (לוקח כדקה). נסו לרענן עוד רגע.</div>';
+    setTimeout(() => location.hash.replace('#', '').replace('/', '') === '' && route(), 15000);
+    return;
+  }
   const s = d.summary;
   view.innerHTML = `
     <div class="fact" id="fact"></div>

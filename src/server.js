@@ -221,11 +221,13 @@ function keepAlive() {
 const start = async () => {
   restoreSeason();
   try { await initStore(); } catch (e) { console.error('[store] חיבור למסד הנתונים נכשל – ממשיך עם קבצים בלבד:', e.message); }
-  if (!state().updatedAt || !ilState().updatedAt) {
-    try { await fullRefresh('הפעלה ראשונה'); } catch (e) { console.error('refresh failed', e.message); }
-  }
+  // מתחילים לקבל בקשות מיד; איסוף הנתונים רץ ברקע (בשרת חדש הוא לוקח דקה-שתיים)
   app.listen(config.port, () => console.log(`🏀 השרת רץ על http://localhost:${config.port}`));
-  if (process.env.NO_SCHEDULER !== '1') startScheduler();
+  if (process.env.NO_SCHEDULER !== '1') {
+    startScheduler(); // הסבב הראשון של המתזמן מבצע עדכון מלא אם אין עדיין נתונים
+  } else if (!state().updatedAt || !ilState().updatedAt) {
+    fullRefresh('הפעלה ראשונה').catch((e) => console.error('refresh failed', e.message));
+  }
   keepAlive();
 };
 start();
