@@ -260,3 +260,8 @@ a.gchip:hover { border-color: var(--blue); }
 .bround:not(.last) .bslot::after, .bround:not(.first) .bslot::before { width: 6px; border-top-color: var(--muted); opacity: .55; }
 .bpair::after { border-inline-end-color: var(--muted); opacity: .55; }
 .rising { color: var(--win); font-weight: 800; font-size: 13px; }
+.abs-group { font-size: 12px; font-weight: 700; color: var(--muted); padding: 10px 0 2px; border-top: 1px dashed var(--line); margin-top: 4px; }
+.lgroup { font-size: 11px; font-weight: 800; color: var(--muted); margin: 6px 0 4px; }
+.lchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lchip { display: inline-flex; align-items: center; gap: 5px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px 2px 3px; font-size: 12px; font-weight: 600; }
+.avatar.sm { width: 24px; height: 24px; font-size: 12px; }

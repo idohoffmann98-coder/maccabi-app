@@ -7,7 +7,7 @@
 import { config } from './config.js';
 import { load, save } from './store.js';
 import * as el from './euroleague.js';
-import { buildPreview, findGame, fullRefresh, ilState, nextGame, previews, state, refreshClub, refreshIsrael } from './data.js';
+import { buildPreview, findGame, fullRefresh, ilState, nextGame, previews, state, refreshClub, refreshIsrael, updateLineup } from './data.js';
 import { sendPush } from './push.js';
 
 const MIN = 60 * 1000;
@@ -22,6 +22,8 @@ const mark = (id, kind) => {
 let lastFull = 0;
 let lastPoll = 0;
 let liveQuarter = 0;
+let lastLineup = 0;
+const startersFound = new Set();
 let busy = false;
 
 const secsLeft = (t) => {
@@ -51,6 +53,12 @@ async function tick() {
     const pv = previews()[g.id];
     if (!pv || (now >= previewAt && new Date(pv.builtAt).getTime() < previewAt)) {
       await buildPreview(g);
+    }
+
+    // הסגל למשחק והחמישייה הפותחת: מ-90 דקות לפני ועד 20 דקות אחרי הפתיחה, כל 5 דקות (עד שהחמישייה ידועה)
+    if (g.comp === 'euroleague' && !startersFound.has(g.id) && now >= tip - 90 * MIN && now <= tip + 20 * MIN && now - lastLineup >= 5 * MIN) {
+      lastLineup = now;
+      if (await updateLineup(g)) startersFound.add(g.id);
     }
 
     if (g.timeTBD || now < tip - 2 * MIN) return;

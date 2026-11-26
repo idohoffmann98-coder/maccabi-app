@@ -438,3 +438,33 @@ export function setInjury({ playerCode, playerName, injury, expectedReturn, note
 export function clearInjury(playerCode) {
   save('injuries', injuries().filter((i) => i.playerCode !== playerCode));
 }
+
+// ---------- הסגל למשחק והחמישייה הפותחת (יורוליג) ----------
+// ה-API מחזיר את רשימת השחקנים של משחק רק סמוך לפתיחה. השרת בודק את זה שוב ושוב לפני המשחק,
+// וכשהרשימה מופיעה – שומר אותה בתצוגה המקדימה (ומי שבסגל כבר לא מוצג כנעדר).
+export async function updateLineup(game) {
+  if (game.comp !== 'euroleague' || game.status === 'result') return false;
+  let box;
+  try {
+    box = await el.fetchBoxscore(state().season, game.raw.code, game.raw);
+  } catch {
+    return false;
+  }
+  const side = (s) => (s?.players || []).map((p) => ({ code: p.code, name: playerHe(p.name), dorsal: p.dorsal, starter: p.starter, headshot: p.headshot }));
+  const home = side(box.home);
+  const away = side(box.away);
+  if (!home.length && !away.length) return false;
+  const ours = game.isHome ? home : away;
+  const theirs = game.isHome ? away : home;
+  const all = previews();
+  const pv = all[game.id] || (await buildPreview(game));
+  const prevCount = (pv.lineup?.ours?.length || 0) + (pv.lineup?.theirs?.length || 0);
+  const prevStarters = pv.lineup?.ours?.filter((p) => p.starter).length || 0;
+  pv.lineup = { ours, theirs, startersKnown: ours.some((p) => p.starter), fetchedAt: new Date().toISOString() };
+  all[game.id] = pv;
+  save('previews', all);
+  if (prevCount !== ours.length + theirs.length || prevStarters !== ours.filter((p) => p.starter).length) {
+    console.log(`[data] סגל למשחק ${game.id}: ${ours.length} שחקני מכבי${pv.lineup.startersKnown ? ' (כולל חמישייה פותחת)' : ''}`);
+  }
+  return pv.lineup.startersKnown;
+}

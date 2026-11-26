@@ -114,6 +114,20 @@ app.get('/api/games/:id', async (req, res) => {
   if (!preview && g.status !== 'result') {
     try { preview = await buildPreview(g); } catch (e) { console.warn(e.message); }
   }
+  // כשהסגל למשחק כבר פורסם: הנעדרים = מי שלא נמצא בו (במקום "לא שיחק לאחרונה")
+  if (preview?.lineup?.ours?.length) {
+    const inLineup = new Set(preview.lineup.ours.map((p) => p.code));
+    const inj = activeInjuries();
+    const ours = state().roster.filter((r) => !inLineup.has(r.code)).map((r) => {
+      const i = inj.find((x) => x.playerCode === r.code);
+      return { code: r.code, name: playerHe(r.name), headshot: r.headshot, missedGames: 0, injury: i?.injury || null, expectedReturn: i?.expectedReturn || null, note: i?.note || null, link: i?.link || null, source: 'lineup' };
+    });
+    const theirsIn = new Set((preview.lineup.theirs || []).map((p) => p.code));
+    const theirs = preview.absences.theirs && preview.lineup.theirs?.length
+      ? preview.absences.theirs.filter((a) => !theirsIn.has(a.code)).map((a) => ({ ...a, source: 'lineup' }))
+      : preview.absences.theirs;
+    preview = { ...preview, absences: { ours, theirs, lineupKnown: true } };
+  }
   res.json({ game: strip(g), box, top, preview });
 });
 

@@ -157,11 +157,36 @@ function boxTable(side) {
   </table></div></div>`;
 }
 
-function absList(list) {
-  if (!list.length) return '<div class="empty">אין נעדרים ידועים 💪</div>';
-  return list.map((a) => `<div class="abs">${img(a.headshot)}<div><div><b>${esc(a.name)}</b></div>
+function absRow(a) {
+  const why = a.source === 'lineup' ? 'לא בסגל למשחק'
+    : a.missedGames ? `לא שיחק ב-${num(a.missedGames)} ${a.missedGames === 1 ? 'משחק היורוליג האחרון' : 'משחקי היורוליג האחרונים'}` : '';
+  return `<div class="abs">${img(a.headshot)}<div><div><b>${esc(a.name)}</b></div>
     ${a.injury ? `<div class="inj">🩹 ${esc(a.injury)}${a.expectedReturn ? ` · חזרה משוערת: ${esc(a.expectedReturn)}` : ''}</div>` : ''}
-    <div class="why">${a.missedGames ? `לא שיחק ב-${a.missedGames} ${a.missedGames === 1 ? 'משחק היורוליג האחרון' : 'משחקי היורוליג האחרונים'}` : 'שיחק במשחק האחרון'}${a.note ? ` · ${esc(a.note)}` : ''}${a.link ? ` · <a href="${esc(a.link)}" target="_blank" rel="noopener">לעדכון ↗</a>` : ''}</div></div></div>`).join('');
+    <div class="why">${why}${a.note ? `${why ? ' · ' : ''}${esc(a.note)}` : ''}${a.link ? ` · <a href="${esc(a.link)}" target="_blank" rel="noopener">לעדכון ↗</a>` : ''}</div></div></div>`;
+}
+
+// כשהסגל פורסם: "לא בסגל למשחק". לפני כן: פצועים מאושרים בנפרד, ו"לא שיחקו לאחרונה" (ייתכן שישחקו)
+function absList(list, lineupKnown) {
+  if (!list.length) return `<div class="empty">${lineupKnown ? 'כל השחקנים בסגל 💪' : 'אין נעדרים ידועים 💪'}</div>`;
+  if (lineupKnown) return list.map(absRow).join('');
+  const injured = list.filter((a) => a.source !== 'auto' || a.injury);
+  const recent = list.filter((a) => a.source === 'auto' && !a.injury);
+  return `${injured.map(absRow).join('')}
+    ${recent.length ? `<div class="abs-group">לא שיחקו לאחרונה · ייתכן שישחקו</div>${recent.map(absRow).join('')}` : ''}`;
+}
+
+function lineupView(lu, oppName) {
+  const team = (name, list) => {
+    if (!list?.length) return '';
+    const starters = list.filter((p) => p.starter);
+    const rest = list.filter((p) => !p.starter);
+    const chip = (p) => `<span class="lchip">${img(p.headshot, 'avatar sm')}<span>${esc(String(Number(p.dorsal)))} ${esc(p.name)}</span></span>`;
+    return `<div class="card"><h3>${esc(name)}</h3>
+      ${starters.length ? `<div class="lgroup">חמישייה פותחת</div><div class="lchips">${starters.map(chip).join('')}</div><div class="lgroup">מהספסל</div>` : ''}
+      <div class="lchips">${(starters.length ? rest : list).map(chip).join('')}</div></div>`;
+  };
+  return `<h2>📋 ${lu.startersKnown ? 'הרכבים' : 'הסגל למשחק'} <small>עודכן ${fmtDate(lu.fetchedAt, { hour: '2-digit', minute: '2-digit' })}</small></h2>
+    <div class="split">${team('מכבי', lu.ours)}${team(oppName, lu.theirs)}</div>`;
 }
 
 async function game(id) {
@@ -180,8 +205,11 @@ async function game(id) {
   if (p && g.status !== 'result') {
     const h = p.h2h;
     const theirsAbs = p.absences.theirs;
-    html += `<h2>🩹 פצועים ונעדרים <small>נבדק ${fmtDate(p.builtAt, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</small></h2>
-      <div class="${theirsAbs ? 'split' : ''}"><div class="card"><h3>מכבי</h3>${absList(p.absences.ours)}</div>${theirsAbs ? `<div class="card"><h3>${esc(p.opp.name)}</h3>${absList(theirsAbs)}</div>` : ''}</div>
+    const lk = !!p.absences.lineupKnown;
+    html += `${p.lineup ? lineupView(p.lineup, p.opp.name) : ''}
+      <h2>🩹 ${lk ? 'לא בסגל למשחק' : 'פצועים ונעדרים'} <small>${lk ? 'לפי הסגל הרשמי' : `נבדק ${fmtDate(p.builtAt, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}`}</small></h2>
+      ${!lk && g.comp === 'euroleague' ? '<div class="small muted" style="margin:-4px 2px 8px">הסגל הרשמי והחמישייה הפותחת יתעדכנו כאן סמוך למשחק</div>' : ''}
+      <div class="${theirsAbs ? 'split' : ''}"><div class="card"><h3>מכבי</h3>${absList(p.absences.ours, lk)}</div>${theirsAbs ? `<div class="card"><h3>${esc(p.opp.name)}</h3>${absList(theirsAbs, lk)}</div>` : ''}</div>
       <h2>⚔️ מפגשי עבר מול ${esc(p.opp.name)} <small>העונה ושתי העונות הקודמות</small></h2>
       <div class="card">${h.meetings.length ? `<div class="rec"><div class="w"><b>${h.record.won}</b><span class="small muted">ניצחונות מכבי</span></div><div class="l"><b>${h.record.lost}</b><span class="small muted">ניצחונות ${esc(p.opp.name)}</span></div></div>
       <div class="small muted" style="text-align:start">תוצאה: מכבי - יריבה</div>
