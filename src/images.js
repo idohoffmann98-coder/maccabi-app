@@ -34,7 +34,16 @@ export function imgUrl(src, w = 96, kind = 'img') {
 }
 
 async function produce(src, w, file, kind) {
-  const res = await fetch(src, { headers: { 'user-agent': 'Mozilla/5.0 (fan-app)' }, redirect: 'error', signal: AbortSignal.timeout(20000) });
+  // הפניות מותרות רק בין אתרים מהרשימה (למשל www.basket.co.il ← basket.co.il)
+  let url = src;
+  let res;
+  for (let hop = 0; ; hop++) {
+    res = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0 (fan-app)' }, redirect: 'manual', signal: AbortSignal.timeout(20000) });
+    if (res.status < 300 || res.status >= 400) break;
+    const next = new URL(res.headers.get('location') || '', url);
+    if (hop >= 3 || next.protocol !== 'https:' || !ALLOWED.has(next.hostname)) throw new Error('redirect not allowed');
+    url = next.href;
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const len = Number(res.headers.get('content-length') || 0);
   if (len > MAX_BYTES) throw new Error('too large');
