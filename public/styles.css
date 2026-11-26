@@ -259,3 +259,4 @@ a.gchip:hover { border-color: var(--blue); }
 .bslot { padding: 5px 6px; }
 .bround:not(.last) .bslot::after, .bround:not(.first) .bslot::before { width: 6px; border-top-color: var(--muted); opacity: .55; }
 .bpair::after { border-inline-end-color: var(--muted); opacity: .55; }
+.rising { color: var(--win); font-weight: 800; font-size: 13px; }

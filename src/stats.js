@@ -80,13 +80,18 @@ export function playersTable(games, boxscores, roster, teamCode) {
   return out.sort((a, b) => (b.pts || 0) - (a.pts || 0));
 }
 
-// "שחקנים חמים": ממוצע מדד (PIR) ב-3 המשחקים האחרונים לעומת ממוצע העונה
+// "שחקנים חמים": ממוצע מדד (PIR) ב-3 המשחקים האחרונים לעומת ממוצע העונה. עד 3 שחקנים; אם אין – רשימה ריקה
 export function hotPlayers(games, boxscores, teamCode, { last = 3, limit = 3 } = {}) {
   const logs = playerLogs(games, boxscores, teamCode);
+  // רק שחקנים ששיחקו לפחות באחד משני המשחקים האחרונים של הקבוצה (בלי פצועים / שחקנים שלא משחקים)
+  const recentTeamGames = new Set(
+    games.filter((g) => g.status === 'result' && boxscores[g.code]).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 2).map((g) => g.code),
+  );
   const res = [];
   for (const log of logs.values()) {
     const gs = log.games;
     if (gs.length < last + 2) continue;
+    if (!gs.some((g) => recentTeamGames.has(g.gameCode))) continue;
     const recent = gs.slice(-last);
     const avg = (arr, k) => arr.reduce((s, g) => s + g[k], 0) / arr.length;
     const seasonPir = avg(gs, 'pir');
@@ -94,8 +99,13 @@ export function hotPlayers(games, boxscores, teamCode, { last = 3, limit = 3 } =
     const seasonPts = avg(gs, 'pts');
     const recentPts = avg(recent, 'pts');
     const delta = recentPir - seasonPir;
-    if (recentPir >= 8 && delta >= Math.max(3, seasonPir * 0.2)) {
+    // 🔥 חם: כושר חריג (מדד 8+ ועלייה של 20% ולפחות 3 נקודות מדד)
+    // 📈 בעלייה: שיפור ברור אבל מתון יותר (מדד 6+ ועלייה של 10% ולפחות 1.5)
+    const hot = recentPir >= 8 && delta >= Math.max(3, seasonPir * 0.2);
+    const rising = !hot && recentPir >= 6 && delta >= Math.max(1.5, seasonPir * 0.1);
+    if (hot || rising) {
       res.push({
+        level: hot ? 'hot' : 'rising',
         code: log.code,
         name: playerHe(log.name),
         headshot: log.headshot,
@@ -108,7 +118,7 @@ export function hotPlayers(games, boxscores, teamCode, { last = 3, limit = 3 } =
       });
     }
   }
-  return res.sort((a, b) => b.delta - a.delta).slice(0, limit);
+  return res.sort((a, b) => (a.level === b.level ? b.delta - a.delta : a.level === 'hot' ? -1 : 1)).slice(0, limit);
 }
 
 // נעדרים: שחקני סגל שלא שיחקו במשחקים האחרונים (+ מידע ידני על פציעה)

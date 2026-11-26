@@ -119,7 +119,7 @@ async function home() {
 }
 
 const hotRow = (h) => `<a class="player-row" href="#/player/${esc(h.code)}">${img(h.headshot)}
-  <div class="info"><div class="name">${esc(h.name)} <span class="flame">🔥 +${h.delta}</span></div>
+  <div class="info"><div class="name">${esc(h.name)} ${h.level === 'rising' ? `<span class="rising">📈 בעלייה +${num(h.delta)}</span>` : `<span class="flame">🔥 +${num(h.delta)}</span>`}</div>
   <div class="trend">מדד <b>${h.recentPir}</b> לעומת ${h.seasonPir} בעונה · <b>${h.recentPts}</b> נק' לעומת ${h.seasonPts}</div>
   <div class="trend">${h.lastGames.map((g) => `${g.pts} נק' מול ${esc(g.opp)}`).join(' · ')}</div></div></a>`;
 
@@ -167,7 +167,7 @@ function absList(list) {
 async function game(id) {
   const d = await api(`games/${esc(id)}`);
   const g = d.game;
-  let html = `<a class="back" href="#/games">→ חזרה ללוח המשחקים</a>${matchCard(g, { link: false })}`;
+  let html = `${backLink('#/games', 'חזרה ללוח המשחקים')}${matchCard(g, { link: false })}`;
   if (g.url) {
     const site = g.id.startsWith('mc') ? 'באתר מכבי' : 'באתר מנהלת הליגה';
     html += `<a class="cta" href="${esc(g.url)}" target="_blank" rel="noopener">${g.status === 'result' ? `סטטיסטיקה מלאה ${site} ↗` : `דף המשחק ${site} ↗`}</a>`;
@@ -190,9 +190,11 @@ async function game(id) {
       ${h.lastMeetingTop?.overall ? `<h2>⭐ המוביל במפגש האחרון</h2><div class="card"><div class="mvp">${img(h.lastMeetingTop.overall.headshot, 'avatar lg')}<div><div class="big">${esc(h.lastMeetingTop.overall.name)}</div><div class="line">${esc(h.lastMeetingTop.overall.teamName)}</div><div class="line">${h.lastMeetingTop.overall.pts} נק' · ${h.lastMeetingTop.overall.reb} ריב' · ${h.lastMeetingTop.overall.ast} אס' · מדד ${h.lastMeetingTop.overall.pir}</div></div></div>
         ${h.lastMeetingTop.ours && h.lastMeetingTop.ours.code !== h.lastMeetingTop.overall.code ? `<div class="small muted" style="margin-top:8px">המצטיין של מכבי: <b>${esc(h.lastMeetingTop.ours.name)}</b> – ${h.lastMeetingTop.ours.pts} נק', מדד ${h.lastMeetingTop.ours.pir}</div>` : ''}</div>`
         : h.lastMeeting?.url ? `<a class="cta" href="${esc(h.lastMeeting.url)}" target="_blank" rel="noopener">המובילים במפגש האחרון – באתר המנהלת ↗</a>` : ''}
-      <h2>🔥 שחקנים חמים <small>לפי משחקי היורוליג האחרונים</small></h2>
-      <div class="${p.hot.theirs ? 'split' : ''}"><div class="card hot"><h3>מכבי</h3>${p.hot.ours.map(hotRow).join('') || '<div class="empty">אין שחקן בכושר חריג כרגע</div>'}</div>
-      ${p.hot.theirs ? `<div class="card hot"><h3>${esc(p.opp.name)}</h3>${p.hot.theirs.map(hotRow).join('') || '<div class="empty">אין שחקן בכושר חריג כרגע</div>'}</div>` : ''}</div>
+      ${(() => {
+        const cards = [['מכבי', p.hot.ours], [p.opp.name, p.hot.theirs]].filter(([, l]) => l && l.length);
+        return cards.length ? `<h2>🔥 שחקנים חמים <small>לפי משחקי היורוליג האחרונים</small></h2>
+          <div class="${cards.length > 1 ? 'split' : ''}">${cards.map(([n, l]) => `<div class="card hot"><h3>${esc(n)}</h3>${l.map(hotRow).join('')}</div>`).join('')}</div>` : '';
+      })()}
       ${p.oppStanding ? `<h2>בטבלה <small>${esc(p.oppStanding.table)}</small></h2><div class="card"><div class="h2h"><span>מכבי – מקום ${p.ourStanding?.position ?? '-'}</span><span>${p.ourStanding?.won ?? 0} נ' / ${p.ourStanding?.lost ?? 0} ה'</span></div><div class="h2h"><span>${esc(p.opp.name)} – מקום ${p.oppStanding.position}</span><span>${p.oppStanding.won} נ' / ${p.oppStanding.lost} ה'</span></div></div>` : ''}`;
   } else if (g.status !== 'result') {
     html += `<div class="card empty" style="margin-top:10px">התצוגה המקדימה (פצועים, מפגשי עבר ושחקנים חמים) תתעדכן לקראת המשחק.</div>`;
@@ -231,7 +233,7 @@ async function players() {
 async function player(code) {
   const p = await api(`players/${esc(code)}`);
   const age = p.birthDate ? Math.floor((Date.now() - new Date(p.birthDate)) / 31557600000) : null;
-  view.innerHTML = `<a class="back" href="#/players">→ חזרה לשחקנים</a>
+  view.innerHTML = `${backLink('#/players', 'חזרה לשחקנים')}
     <div class="card profile">${img(p.headshot, 'avatar lg')}<div><h1>${esc(p.name)}</h1>
       <div class="muted">#${esc(p.dorsal)} · ${esc(p.positionHe || '')}${age ? ` · גיל ${age}` : ''}${p.height ? ` · ${p.height} ס"מ` : ''}</div>
       ${p.injury ? `<div class="inj" style="color:var(--loss);font-weight:700;margin-top:4px">🩹 ${esc(p.injury.injury)}${p.injury.expectedReturn ? ` · היעדרות: ${esc(p.injury.expectedReturn)}` : ''}</div>` : ''}</div></div>
@@ -382,15 +384,49 @@ const routes = [
   [/^#\/player\/(\w+)$/, player, 'players'],
   [/^#\/standings$/, standings, 'standings'],
 ];
+// היסטוריית ניווט בתוך האפליקציה: כפתור "חזרה" מחזיר למסך שממנו באמת הגעת (ולמקום בגלילה)
+const navStack = []; // [{ hash, scroll }]
+const BACK_LABEL = (h) =>
+  /^#?\/?$/.test(h) ? 'חזרה למסך הבית'
+  : h === '#/games' ? 'חזרה ללוח המשחקים'
+  : h === '#/players' ? 'חזרה לשחקנים'
+  : h === '#/standings' ? 'חזרה לטבלה'
+  : h.startsWith('#/game/') ? 'חזרה למשחק'
+  : h.startsWith('#/player/') ? 'חזרה לשחקן' : 'חזרה';
+function backLink(fallbackHash, fallbackLabel) {
+  const prev = navStack[navStack.length - 2];
+  return prev
+    ? `<a class="back" href="${esc(prev.hash)}" data-back>→ ${BACK_LABEL(prev.hash)}</a>`
+    : `<a class="back" href="${esc(fallbackHash)}">→ ${fallbackLabel}</a>`;
+}
+view.addEventListener('click', (e) => {
+  const a = e.target.closest('a[data-back]');
+  if (a && navStack.length > 1) {
+    e.preventDefault();
+    history.back();
+  }
+});
+
 async function route() {
   const h = location.hash || '#/';
+  // חזרה אחורה (כפתור החזרה או כפתור "אחורה" של הטלפון) מול מעבר למסך חדש
+  let restore = 0;
+  if (navStack.length > 1 && navStack[navStack.length - 2].hash === h) {
+    navStack.pop();
+    restore = navStack[navStack.length - 1].scroll || 0;
+  } else if (navStack[navStack.length - 1]?.hash !== h) {
+    if (navStack.length) navStack[navStack.length - 1].scroll = window.scrollY;
+    // מעבר בין לשוניות התחתונות מתחיל היסטוריה חדשה
+    if (/^#?\/?$|^#\/(games|players|standings)$/.test(h)) navStack.length = 0;
+    navStack.push({ hash: h, scroll: 0 });
+  }
   for (const [re, fn, tab] of routes) {
     const m = h.match(re);
     if (!m) continue;
     document.querySelectorAll('.tabs a').forEach((a) => a.classList.toggle('active', a.dataset.tab === tab));
     view.innerHTML = '<div class="loading">טוען…</div>';
     try { await fn(...m.slice(1)); } catch (e) { view.innerHTML = `<div class="empty">אופס, לא הצלחנו לטעון את הנתונים (${esc(e.message)})</div>`; }
-    window.scrollTo(0, 0);
+    window.scrollTo(0, restore);
     return;
   }
   location.hash = '#/';
