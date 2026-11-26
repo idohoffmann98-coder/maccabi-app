@@ -133,9 +133,23 @@ function combinedPlayers(elPlayers, ilPlayers) {
   return out;
 }
 
+// שחקני ליגת העל עם התמונה מהסגל באתר המנהלת
+function leaguePlayers() {
+  const ilS = ilState();
+  const photo = new Map((ilS.roster || []).map((r) => [r.playerId, r.photo]));
+  return (ilS.players || []).map((p) => ({ ...p, headshot: photo.get(p.playerId) || null }));
+}
+
+// סמלי הקבוצות בליגת העל: מתוך לוח המשחקים של מכבי (מופיעות בו כל הקבוצות)
+function leagueCrests() {
+  const m = new Map();
+  for (const g of ilState().games || []) for (const t of [g.home, g.away]) if (t.teamId && t.crest && !m.has(t.teamId)) m.set(t.teamId, t.crest);
+  return m;
+}
+
 app.get('/api/players', (req, res) => {
   const { players } = computed();
-  const ilS = ilState();
+  const ilS = { ...ilState(), players: leaguePlayers() };
   res.json({
     euroleague: players,
     league: ilS.players || [],
@@ -159,7 +173,7 @@ app.get('/api/standings', (req, res) => {
   const ilS = ilState();
   res.json({
     euroleague: { round: s.standingsRound, teams: s.standings.map((t) => ({ ...t, nameHe: teamHe(t.code, t.name), us: t.code === TEAM })) },
-    league: { teams: (ilS.table || []).map((t) => ({ ...t, nameHe: /מכבי ת"א/.test(t.name) ? 'מכבי תל אביב' : t.name, us: /מכבי ת"א/.test(t.name) })) },
+    league: { teams: (ilS.table || []).map((t) => ({ ...t, crest: t.crest || leagueCrests().get(t.teamId) || null, nameHe: /מכבי ת"א/.test(t.name) ? 'מכבי תל אביב' : t.name, us: /מכבי ת"א/.test(t.name) })) },
   });
 });
 
